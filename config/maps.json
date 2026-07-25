@@ -1,0 +1,1904 @@
+{
+  "_readme": [
+    "道路種別 / 用途地域 / 土砂災害マップ の各タブが開く外部地図サイトの登録簿です。",
+    "muniFirstPrefs に含まれる都道府県は「市区町村の地図 → 都道府県の地図 → 全国の地図」の順で探します。",
+    "それ以外の都道府県は「都道府県の地図 → 全国の地図」の順で探します。",
+    "url には {lat} 緯度 / {lon} 経度 / {z} ズーム / {mps} 縮尺分母 を埋め込めます（config/settings.json の gis で既定値を変更可）。",
+    "embed:false のサイトは埋め込み表示を拒否するため、別タブで開くボタンだけを表示します。"
+  ],
+  "muniFirstPrefs": [
+    "東京都",
+    "神奈川県",
+    "千葉県",
+    "埼玉県"
+  ],
+  "national": {
+    "road": {
+      "name": "不動産情報ライブラリ（国土交通省）",
+      "url": "https://www.reinfolib.mlit.go.jp/",
+      "embed": false,
+      "note": "建築基準法上の道路種別は自治体ごとの指定道路図での確認が必要です。"
+    },
+    "zoning": {
+      "name": "用途地域（都市計画決定GIS・全国）",
+      "url": "https://www.arcgis.com/apps/mapviewer/index.html?layers=d98c85fe116647ac8c75fcef272abe8d&center={lon},{lat}&level={z}",
+      "note": "国土交通省の都市計画決定GISデータ（用途地域）を全国分まとめたレイヤです。"
+    },
+    "sediment": {
+      "name": "重ねるハザードマップ（土砂災害警戒区域等）",
+      "url": "https://disaportal.gsi.go.jp/maps/index.html?ll={lat},{lon}&z={z}&base=pale&ls=dosha_keikai_kyukeisha%7Cdosha_keikai_dosekiryu%7Cdosha_keikai_jisuberi&disp=111&vs=c1j0h0k0l0u0t0z0r0s0m0f1"
+    }
+  },
+  "pref": {
+    "北海道": {
+      "sediment": {
+        "name": "北海道土砂災害警戒情報システム",
+        "url": "https://www.njwa.jp/hokkaido-sabou/"
+      }
+    },
+    "青森県": {
+      "sediment": {
+        "name": "土砂災害警戒区域等マップ",
+        "url": "https://www.sabomap.jp/aomori/",
+        "embed": false
+      }
+    },
+    "岩手県": {
+      "sediment": {
+        "name": "いわてデジタルマップ",
+        "url": "https://www.sonicweb-asp.jp/iwate/map?theme=th_59"
+      }
+    },
+    "宮城県": {
+      "sediment": {
+        "name": "宮城県砂防総合情報システム MIDSKI",
+        "url": "https://www.doshasaigai.pref.miyagi.jp/midski/map.html?kind=1",
+        "embed": false
+      }
+    },
+    "秋田県": {
+      "sediment": {
+        "name": "秋田県土砂災害危険箇所マップ",
+        "url": "https://sabomap.pref.akita.lg.jp/"
+      }
+    },
+    "山形県": {
+      "sediment": {
+        "name": "山形県土砂災害警戒システム",
+        "url": "https://sabo.pref.yamagata.jp/",
+        "embed": false,
+        "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+      }
+    },
+    "福島県": {
+      "sediment": {
+        "name": "福島県防災情報マップ2D/3D",
+        "url": "https://dmap.pref.fukushima.lg.jp/",
+        "embed": false
+      }
+    },
+    "茨城県": {
+      "zoning": {
+        "name": "いばらきデジタルまっぷ（都市計画（結城市））",
+        "url": "https://www2.wagmap.jp/ibaraki/Map?mid=65&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+      },
+      "road": {
+        "name": "いばらきデジタルまっぷ（指定道路（一部地域））",
+        "url": "https://www2.wagmap.jp/ibaraki/Map?mid=30&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+      },
+      "sediment": {
+        "name": "いばらきデジタルまっぷ（土砂災害警戒区域等指定箇所マップ）",
+        "url": "https://www2.wagmap.jp/ibaraki/Map?mid=80&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+      }
+    },
+    "栃木県": {
+      "sediment": {
+        "name": "栃木県土砂災害警戒情報",
+        "url": "https://dsabo.pref.tochigi.lg.jp/SearchKeikai",
+        "embed": false
+      }
+    },
+    "群馬県": {
+      "sediment": {
+        "name": "マッピングぐんま（土砂災害警戒区域等）",
+        "url": "https://www2.wagmap.jp/pref-gunma/Map?mid=135&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+        "embed": false,
+        "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+      }
+    },
+    "埼玉県": {
+      "zoning": {
+        "name": "埼玉県GIS",
+        "url": "https://portal-pref-saitama.hub.arcgis.com/"
+      },
+      "road": {
+        "name": "埼玉県GIS",
+        "url": "https://portal-pref-saitama.hub.arcgis.com/"
+      },
+      "sediment": {
+        "name": "埼玉県GIS 道路・河川インフラマップ",
+        "url": "https://portal-pref-saitama.hub.arcgis.com/",
+        "note": "レイヤー「ハザードマップ等 → 土砂災害警戒区域等」を選択してください。"
+      }
+    },
+    "千葉県": {
+      "zoning": {
+        "name": "ちば情報マップ（千葉県）",
+        "url": "https://map.pref.chiba.lg.jp/"
+      },
+      "road": {
+        "name": "ちば情報マップ（千葉県）",
+        "url": "https://map.pref.chiba.lg.jp/"
+      },
+      "sediment": {
+        "name": "ちば情報マップ（土砂災害警戒区域等・砂防3法指定区域）",
+        "url": "https://map.pref.chiba.lg.jp/"
+      }
+    },
+    "東京都": {
+      "zoning": {
+        "name": "東京都 都市計画情報等インターネット提供サービス",
+        "url": "https://www2.wagmap.jp/tokyo_tokeizu/Map?mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+      }
+    },
+    "神奈川県": {
+      "zoning": {
+        "name": "e-かなマップ（神奈川県）",
+        "url": "https://www2.wagmap.jp/pref-kanagawa/Map?mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+      },
+      "road": {
+        "name": "e-かなマップ（神奈川県指定道路マップ）",
+        "url": "https://www2.wagmap.jp/pref-kanagawa/Map?mid=21&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+        "embed": false,
+        "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+      },
+      "sediment": {
+        "name": "神奈川県 土砂災害情報ポータル",
+        "url": "https://dosyasaigai.pref.kanagawa.jp/website/kanagawa/gis/index.html",
+        "embed": false
+      }
+    },
+    "新潟県": {
+      "sediment": {
+        "name": "新潟県土砂災害警戒区域等指定状況マップ",
+        "url": "https://www.sabou-niigata.jp/dosyahou/"
+      }
+    },
+    "富山県": {
+      "road": {
+        "name": "富山県GIS",
+        "url": "https://wwwgis.pref.toyama.jp/toyama/"
+      }
+    },
+    "石川県": {
+      "sediment": {
+        "name": "石川県土砂災害情報システム",
+        "url": "https://sabo-exgis.pref.ishikawa.lg.jp/gisserver/index.html"
+      }
+    },
+    "福井県": {
+      "road": {
+        "name": "福井県指定道路公開システム",
+        "url": "https://www2.wagmap.jp/fukuidouro-sp/"
+      }
+    },
+    "山梨県": {
+      "zoning": {
+        "name": "まっぷde山梨",
+        "url": "https://gis.pref.yamanashi.jp/webgis/?bt=0&p=1"
+      },
+      "sediment": {
+        "name": "山梨県土砂災害警戒区域等マップ",
+        "url": "https://www.sabomap.jp/yamanashi/",
+        "embed": false
+      }
+    },
+    "長野県": {
+      "sediment": {
+        "name": "信州 砂防情報マップ",
+        "url": "https://www.sabo.pref.nagano.lg.jp/sabogis/",
+        "embed": false
+      }
+    },
+    "岐阜県": {
+      "zoning": {
+        "name": "県域統合型GISぎふ",
+        "url": "https://gis-gifu.jp/gifu-sp/MapPage?dtp=429&flgInit=1&vpc=0"
+      },
+      "road": {
+        "name": "県域統合型GISぎふ",
+        "url": "https://gis-gifu.jp/gifu-sp/MapPage?dtp=429&flgInit=1&vpc=0"
+      },
+      "sediment": {
+        "name": "県域統合型GISぎふ",
+        "url": "https://gis-gifu.jp/gifu-sp/MapPage?dtp=429&flgInit=1&vpc=0"
+      }
+    },
+    "静岡県": {
+      "zoning": {
+        "name": "静岡県地理情報システム",
+        "url": "https://www.gis.pref.shizuoka.jp/"
+      },
+      "road": {
+        "name": "静岡県地理情報システム",
+        "url": "https://www.gis.pref.shizuoka.jp/"
+      },
+      "sediment": {
+        "name": "静岡県地理情報システム",
+        "url": "https://www.gis.pref.shizuoka.jp/"
+      }
+    },
+    "愛知県": {
+      "sediment": {
+        "name": "愛知県土砂災害情報マップ",
+        "url": "http://sabomaps.pref.aichi.jp/portal/"
+      }
+    },
+    "三重県": {
+      "road": {
+        "name": "三重県地図情報サービス Mie Click Maps",
+        "url": "https://mcm-map-pref-mie.hub.arcgis.com/"
+      },
+      "sediment": {
+        "name": "三重県土砂災害情報提供システム",
+        "url": "http://www1.sabo.pref.mie.jp/MapForm.aspx?m=2"
+      }
+    },
+    "滋賀県": {
+      "sediment": {
+        "name": "滋賀県防災情報マップ",
+        "url": "https://shiga-bousai.jp/dmap/map/index?l=M_d_risk_map",
+        "embed": false
+      }
+    },
+    "京都府": {
+      "zoning": {
+        "name": "京都府・市町村共同統合型地理情報システム",
+        "url": "https://g-kyoto.gis.pref.kyoto.lg.jp/g-kyoto/"
+      },
+      "road": {
+        "name": "京都府・市町村共同統合型地理情報システム",
+        "url": "https://g-kyoto.gis.pref.kyoto.lg.jp/g-kyoto/"
+      },
+      "sediment": {
+        "name": "京都府土砂災害警戒情報",
+        "url": "https://d-keikai.pref.kyoto.jp/MapForm.aspx?m=5",
+        "embed": false
+      }
+    },
+    "大阪府": {
+      "zoning": {
+        "name": "大阪府地図情報提供システム",
+        "url": "https://www11.cals.pref.osaka.jp/ajaxspatial/ajax/",
+        "embed": false
+      },
+      "sediment": {
+        "name": "大阪府土砂災害の防災情報",
+        "url": "https://www.osaka-dosya-portal.net/Map/Index"
+      }
+    },
+    "兵庫県": {
+      "road": {
+        "name": "兵庫県指定道路情報",
+        "url": "https://web.pref.hyogo.lg.jp/ks29/shiteidoro.html"
+      },
+      "sediment": {
+        "name": "兵庫県CGハザードマップ",
+        "url": "http://www.hazardmap.pref.hyogo.jp/"
+      }
+    },
+    "奈良県": {
+      "road": {
+        "name": "奈良県建築基準法道路システム",
+        "url": "https://webgis.alandis.jp/nara29p/ks/portal/"
+      },
+      "sediment": {
+        "name": "奈良県災害リスク情報システム",
+        "url": "https://www1.nara-saboinfo.jp/"
+      }
+    },
+    "和歌山県": {
+      "sediment": {
+        "name": "わかやま土砂災害マップ",
+        "url": "https://sabomap.pref.wakayama.jp/",
+        "embed": false,
+        "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+      }
+    },
+    "鳥取県": {
+      "zoning": {
+        "name": "とっとりWebマップ",
+        "url": "https://www.pref.tottori.lg.jp/item/285382.htm",
+        "embed": false
+      },
+      "sediment": {
+        "name": "鳥取県土砂災害危険警報システム",
+        "url": "https://d-keikai.sabo-tottori.jp/MapForm.aspx?m=0"
+      }
+    },
+    "島根県": {
+      "sediment": {
+        "name": "マップonしまね",
+        "url": "https://web-gis.pref.shimane.lg.jp/"
+      }
+    },
+    "岡山県": {
+      "sediment": {
+        "name": "岡山県防災マップ",
+        "url": "https://www.gis.pref.okayama.jp/bousai/"
+      }
+    },
+    "広島県": {
+      "road": {
+        "name": "広島県インフラマネジメント基盤 DoboX",
+        "url": "https://hiroshima-dobox.jp/visualizations/index",
+        "embed": false
+      },
+      "sediment": {
+        "name": "広島県インフラマネジメント基盤 DoboX",
+        "url": "https://hiroshima-dobox.jp/visualizations/index",
+        "embed": false
+      }
+    },
+    "山口県": {
+      "road": {
+        "name": "いんふらまるごとマネジメント",
+        "url": "https://infradb.pref.yamaguchi.lg.jp/",
+        "embed": false
+      },
+      "sediment": {
+        "name": "山口県土砂災害警戒区域等マップ",
+        "url": "https://d-keikai.pref.yamaguchi.lg.jp/Mapkeikai.aspx"
+      }
+    },
+    "徳島県": {
+      "zoning": {
+        "name": "徳島県都市計画マップ",
+        "url": "https://maps.pref.tokushima.lg.jp/toshikeikaku/",
+        "embed": false
+      },
+      "road": {
+        "name": "徳島県県土防災情報",
+        "url": "https://bousai.pref.tokushima.lg.jp/map/",
+        "embed": false
+      },
+      "sediment": {
+        "name": "徳島県水防・砂防情報マップ",
+        "url": "https://www.dmap.pref.tokushima.lg.jp/Top"
+      }
+    },
+    "香川県": {
+      "road": {
+        "name": "香川県公開型GIS BRIDGES",
+        "url": "https://map.pref.kagawa.lg.jp/"
+      },
+      "sediment": {
+        "name": "香川県公開型GIS BRIDGES",
+        "url": "https://map.pref.kagawa.lg.jp/"
+      }
+    },
+    "愛媛県": {
+      "zoning": {
+        "name": "えひめ都市計画・盛土等情報マップ",
+        "url": "https://webgis.alandis.jp/ehimemorido38p/portal/",
+        "embed": false
+      },
+      "sediment": {
+        "name": "えひめ土砂災害情報マップ",
+        "url": "https://www.sabo.pref.ehime.jp/map/"
+      }
+    },
+    "高知県": {
+      "sediment": {
+        "name": "高知県土砂災害警戒区域等マップ",
+        "url": "https://d-keikai.pref.kochi.lg.jp/MapForm.aspx?mtype=1"
+      }
+    },
+    "福岡県": {
+      "sediment": {
+        "name": "福岡県土砂災害警戒区域等マップ",
+        "url": "https://www2.sabomap.jp/fukuoka/",
+        "embed": false
+      }
+    },
+    "佐賀県": {
+      "sediment": {
+        "name": "佐賀県地理情報システム 安図くん",
+        "url": "https://www.pref.saga.lg.jp/kiji00383833/index.html",
+        "embed": false
+      }
+    },
+    "長崎県": {
+      "sediment": {
+        "name": "長崎県河川砂防情報システム NAKSS",
+        "url": "http://www.nakss.kasen-sabo.pref.nagasaki.jp/sp/",
+        "embed": false
+      }
+    },
+    "熊本県": {
+      "road": {
+        "name": "くまもとデータ連携基盤共通ダッシュボードサービス",
+        "url": "https://www.pref.kumamoto.jp/soshiki/26/201767.html",
+        "embed": false
+      },
+      "sediment": {
+        "name": "熊本県土砂災害情報マップ",
+        "url": "https://sabo.kiken.pref.kumamoto.jp/website/sabo/",
+        "embed": false
+      }
+    },
+    "大分県": {
+      "sediment": {
+        "name": "大分県土砂災害警戒区域等情報インターネット提供システム",
+        "url": "https://sabo-oita.jp/dosya_map/"
+      }
+    },
+    "宮崎県": {
+      "sediment": {
+        "name": "宮崎県土砂災害警戒区域等マップ",
+        "url": "https://www.sabomap.jp/miyazaki/",
+        "embed": false
+      }
+    },
+    "鹿児島県": {
+      "sediment": {
+        "name": "鹿児島県土砂災害警戒区域等マップ",
+        "url": "http://sabomap.pref.kagoshima.jp/kagoshima/",
+        "embed": false
+      }
+    },
+    "沖縄県": {
+      "zoning": {
+        "name": "沖縄県地図情報システム",
+        "url": "http://gis.pref.okinawa.jp/"
+      },
+      "road": {
+        "name": "沖縄県地図情報システム",
+        "url": "http://gis.pref.okinawa.jp/"
+      },
+      "sediment": {
+        "name": "沖縄県地図情報システム",
+        "url": "http://gis.pref.okinawa.jp/"
+      }
+    }
+  },
+  "muni": {
+    "東京都": {
+      "千代田区": {
+        "zoning": {
+          "name": "千代田区都市計画情報提供ポータル",
+          "url": "https://tokei-gis2.chiyodatoshikei.jp/toshikei/apps/experiencebuilder/experience/?id=deb533331f84464098ff8a18fafd5e84"
+        },
+        "road": {
+          "name": "千代田区都市計画情報提供ポータル",
+          "url": "https://tokei-gis2.chiyodatoshikei.jp/toshikei/apps/experiencebuilder/experience/?id=deb533331f84464098ff8a18fafd5e84"
+        }
+      },
+      "中央区": {
+        "zoning": {
+          "name": "中央区都市計画情報等閲覧システム",
+          "url": "https://chuo-map.jp/"
+        },
+        "road": {
+          "name": "中央区都市計画情報等閲覧システム",
+          "url": "https://chuo-map.jp/"
+        }
+      },
+      "港区": {
+        "zoning": {
+          "name": "港区都市計画情報提供サービス",
+          "url": "https://www.sonicweb-asp.jp/minato/"
+        }
+      },
+      "新宿区": {
+        "zoning": {
+          "name": "新宿区みんなのGIS",
+          "url": "https://www.sonicweb-asp.jp/shinjuku2/map?theme=toshikeikaku"
+        }
+      },
+      "文京区": {
+        "zoning": {
+          "name": "文京区都市計画図検索システム",
+          "url": "https://www.sonicweb-asp.jp/bunkyo-youto/"
+        }
+      },
+      "台東区": {
+        "zoning": {
+          "name": "たいとうマップ（都市計画マップ）",
+          "url": "https://www2.wagmap.jp/taito/Map?mid=2&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "墨田区": {
+        "zoning": {
+          "name": "すみだまちづくりマップ（都市計画情報図）",
+          "url": "https://www.sonicweb-asp.jp/sumida/map?theme=th_12"
+        },
+        "road": {
+          "name": "すみだまちづくりマップ（指定道路図）",
+          "url": "https://www.sonicweb-asp.jp/sumida/map?theme=th_8"
+        }
+      },
+      "江東区": {
+        "zoning": {
+          "name": "ことまっぷ",
+          "url": "https://koto.geocloud.jp/"
+        },
+        "road": {
+          "name": "ことまっぷ",
+          "url": "https://koto.geocloud.jp/"
+        }
+      },
+      "品川区": {
+        "zoning": {
+          "name": "しながわMAP（用途地域等指定図）",
+          "url": "https://www2.wagmap.jp/shinagawa/Map?mid=88&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "しながわMAP（指定道路図）",
+          "url": "https://www2.wagmap.jp/shinagawa/Map?mid=67&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "目黒区": {
+        "zoning": {
+          "name": "めぐろ地図情報サービス（地域地区図）",
+          "url": "https://www.sonicweb-asp.jp/meguro/map"
+        },
+        "road": {
+          "name": "めぐろ地図情報サービス（指定道路図）",
+          "url": "https://www.sonicweb-asp.jp/meguro/map?theme=th_3"
+        }
+      },
+      "大田区": {
+        "zoning": {
+          "name": "まちマップおおた（都市計画・景観計画等）",
+          "url": "https://www2.wagmap.jp/ota/Map?mid=1000&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "まちマップおおた（指定道路情報）",
+          "url": "https://www2.wagmap.jp/ota/Map?mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+        },
+        "sediment": {
+          "name": "まちマップおおた（土砂災害（特別）警戒区域図）",
+          "url": "https://www2.wagmap.jp/ota/Map?mid=1001&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "世田谷区": {
+        "zoning": {
+          "name": "せたがやiMap（都市計画情報）",
+          "url": "https://www.sonicweb-asp.jp/setagaya/map?theme=toshikeikaku"
+        },
+        "road": {
+          "name": "せたがやiMap（指定道路図）",
+          "url": "https://www.sonicweb-asp.jp/setagaya/map?theme=shiteidouro"
+        }
+      },
+      "渋谷区": {
+        "zoning": {
+          "name": "渋谷区地図情報システム（都市計画情報）",
+          "url": "https://www2.wagmap.jp/shibuya/Map?mid=1000&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "渋谷区地図情報システム（建築基準法の道路(指定道路図)）",
+          "url": "https://www2.wagmap.jp/shibuya/Map?mid=1008&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "中野区": {
+        "zoning": {
+          "name": "なかの便利地図",
+          "url": "https://www2.wagmap.jp/nakano/Portal"
+        }
+      },
+      "杉並区": {
+        "zoning": {
+          "name": "すぎナビ",
+          "url": "https://suginami.geocloud.jp/"
+        }
+      },
+      "豊島区": {
+        "zoning": {
+          "name": "豊島区地図情報システム",
+          "url": "https://www2.wagmap.jp/toshima/Portal",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "北区": {
+        "zoning": {
+          "name": "北区の地図（都市計画情報）",
+          "url": "https://www2.wagmap.jp/kitaku/Map?mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+        }
+      },
+      "荒川区": {
+        "zoning": {
+          "name": "荒川区地図情報（都市計画マップ）",
+          "url": "https://www2.wagmap.jp/arakawa/Map?mid=3&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "荒川区地図情報（指定道路マップ）",
+          "url": "https://www2.wagmap.jp/arakawa/Map?mid=2&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "板橋区": {
+        "zoning": {
+          "name": "板橋区都市計画情報マップ",
+          "url": "https://itabashi.geocloud.jp/webgis/"
+        }
+      },
+      "練馬区": {
+        "zoning": {
+          "name": "地図情報ねりまっぷ",
+          "url": "https://www.sonicweb-asp.jp/nerimap/"
+        }
+      },
+      "足立区": {
+        "zoning": {
+          "name": "あだち地図情報提供サービス",
+          "url": "https://www.sonicweb-asp.jp/adachi2/"
+        },
+        "road": {
+          "name": "あだち地図情報提供サービス（指定道路）",
+          "url": "https://www.sonicweb-asp.jp/adachi2/map?theme=th_2"
+        }
+      },
+      "葛飾区": {
+        "zoning": {
+          "name": "かつしか電子まっぷ",
+          "url": "https://www.sonicweb-asp.jp/katsushika/"
+        },
+        "road": {
+          "name": "かつしか電子まっぷ（建築基準法道路種別）",
+          "url": "https://www.sonicweb-asp.jp/katsushika/map?theme=th_25"
+        }
+      },
+      "江戸川区": {
+        "zoning": {
+          "name": "江戸川区情報提供サービス（都市計画情報）",
+          "url": "https://www2.wagmap.jp/edogawa/Map?mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+        },
+        "road": {
+          "name": "江戸川区情報提供サービス（指定道路情報）",
+          "url": "https://www2.wagmap.jp/edogawa/Map?mid=2&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "八王子市": {
+        "zoning": {
+          "name": "都市計画マップ（はちおうじマップ）",
+          "url": "https://online.smart-aimap.jp/13201/app/toshikeikaku/index.html"
+        },
+        "road": {
+          "name": "はちおうじマップ",
+          "url": "https://hachiojimap-hachiojicity.hub.arcgis.com/"
+        },
+        "sediment": {
+          "name": "八王子市防災マップ",
+          "url": "https://hachioji-city.github.io/hazardmap/"
+        }
+      },
+      "立川市": {
+        "zoning": {
+          "name": "立川市地理情報システム",
+          "url": "https://webgis.alandis.jp/tachikawa13/portal/",
+          "embed": false
+        },
+        "road": {
+          "name": "立川市地理情報システム",
+          "url": "https://webgis.alandis.jp/tachikawa13/portal/",
+          "embed": false
+        },
+        "sediment": {
+          "name": "立川市地理情報システム",
+          "url": "https://webgis.alandis.jp/tachikawa13/portal/",
+          "embed": false
+        }
+      },
+      "武蔵野市": {
+        "zoning": {
+          "name": "むさしのマップ",
+          "url": "https://musashino.geocloud.jp/"
+        },
+        "road": {
+          "name": "むさしのマップ",
+          "url": "https://musashino.geocloud.jp/"
+        }
+      },
+      "三鷹市": {
+        "zoning": {
+          "name": "三鷹市わがまちマップ（都市計画図）",
+          "url": "https://www2.wagmap.jp/mitakacity/Map?mid=15&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "三鷹市わがまちマップ（道路種別図（建築基準法））",
+          "url": "https://www2.wagmap.jp/mitakacity/Map?mid=29&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "青梅市": {
+        "zoning": {
+          "name": "おうめ地図情報システム（都市計画マップ）",
+          "url": "https://www2.wagmap.jp/omecity/Map?mid=2&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "sediment": {
+          "name": "おうめ地図情報システム（土砂災害警戒区域）",
+          "url": "https://www2.wagmap.jp/omecity/Map?mid=5&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "府中市": {
+        "zoning": {
+          "name": "がいどまっぷ府中",
+          "url": "https://fugis.city.fuchu.tokyo.jp/FuchuInternet/",
+          "embed": false
+        }
+      },
+      "調布市": {
+        "zoning": {
+          "name": "調布まっぷ（都市計画マップ）",
+          "url": "https://www2.wagmap.jp/chofu/Map?mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+        },
+        "road": {
+          "name": "調布まっぷ（道路種別図）",
+          "url": "https://www2.wagmap.jp/chofu/Map?mid=5&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "sediment": {
+          "name": "調布まっぷ（洪水・土砂ハザードマップ）",
+          "url": "https://www2.wagmap.jp/chofu/Map?mid=7&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "町田市": {
+        "zoning": {
+          "name": "地図情報まちだ",
+          "url": "https://machida.kukanjoho.jp/webgis/?bt=-1&p=1",
+          "embed": false
+        },
+        "road": {
+          "name": "地図情報まちだ",
+          "url": "https://machida.kukanjoho.jp/webgis/?bt=-1&p=1",
+          "embed": false
+        }
+      },
+      "小金井市": {
+        "zoning": {
+          "name": "小金井市都市計画マップ",
+          "url": "https://experience.arcgis.com/experience/90dacee114b245098dccc4aa941b4493"
+        }
+      },
+      "小平市": {
+        "zoning": {
+          "name": "こだいら地図情報システム",
+          "url": "https://www.sonicweb-asp.jp/kodaira/"
+        },
+        "road": {
+          "name": "こだいら地図情報システム",
+          "url": "https://www.sonicweb-asp.jp/kodaira/"
+        }
+      },
+      "日野市": {
+        "zoning": {
+          "name": "日野市都市計画情報インターネット配信サービス",
+          "url": "https://experience.arcgis.com/experience/1957946c328a40acb33c11971916a454/"
+        }
+      },
+      "東村山市": {
+        "zoning": {
+          "name": "東村山市地理情報システム",
+          "url": "https://webgis.alandis.jp/higashimurayama13/portal/index.html"
+        },
+        "road": {
+          "name": "東村山市地理情報システム",
+          "url": "https://webgis.alandis.jp/higashimurayama13/portal/index.html"
+        }
+      },
+      "国分寺市": {
+        "zoning": {
+          "name": "わがまちマップ国分寺（都市計画図）",
+          "url": "https://www2.wagmap.jp/kokubunji/Map?mid=11&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "わがまちマップ国分寺（指定道路図）",
+          "url": "https://www2.wagmap.jp/kokubunji/Map?mid=19&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "国立市": {
+        "zoning": {
+          "name": "くにたちガイド",
+          "url": "https://kunitachi.geocloud.jp/",
+          "embed": false
+        },
+        "road": {
+          "name": "くにたちガイド",
+          "url": "https://kunitachi.geocloud.jp/",
+          "embed": false
+        }
+      },
+      "狛江市": {
+        "zoning": {
+          "name": "狛江市地図情報サービス（都市計画図）",
+          "url": "https://www2.wagmap.jp/komaecity/Map?mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+        },
+        "sediment": {
+          "name": "狛江市地図情報サービス（土砂災害警戒区域マップ）",
+          "url": "https://www2.wagmap.jp/komaecity/Map?mid=31&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "清瀬市": {
+        "zoning": {
+          "name": "きよせデジマップ",
+          "url": "https://www.sonicweb-asp.jp/kiyose/"
+        }
+      },
+      "東久留米市": {
+        "zoning": {
+          "name": "東久留米市都市計画情報マップ（Googleマイマップ）",
+          "url": "https://www.google.com/maps/d/viewer?mid=1s43PRDBUwiDPdTXrbNQwo7IiQnNUfsI",
+          "embed": false
+        }
+      },
+      "多摩市": {
+        "zoning": {
+          "name": "多摩市地理情報システム",
+          "url": "https://www.sonicweb-asp.jp/tama/"
+        }
+      },
+      "稲城市": {
+        "zoning": {
+          "name": "稲城市都市計画図",
+          "url": "https://www.city.inagi.tokyo.jp/kankyo/machi_zukuri/1009007/1009008.html",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "西東京市": {
+        "zoning": {
+          "name": "西東京市都市計画図の閲覧",
+          "url": "https://www.city.nishitokyo.lg.jp/siseizyoho/matidukuri/toshikeikakuzu.html",
+          "pdf": true,
+          "embed": false
+        },
+        "road": {
+          "name": "西東京市まちづくりマップ",
+          "url": "https://www2.wagmap.jp/nishitokyo/Portal"
+        }
+      },
+      "昭島市": {
+        "zoning": {
+          "name": "昭島市用途地域計画図（縮尺2,500分の1）",
+          "url": "https://www.city.akishima.lg.jp/machi/toshikei/1006524/1006527.html",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "東大和市": {
+        "zoning": {
+          "name": "東大和市都市計画図",
+          "url": "https://www.city.higashiyamato.lg.jp/shisei/machizukuri/1011235/1011250/1011258.html",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "羽村市": {
+        "zoning": {
+          "name": "羽村市都市計画図",
+          "url": "https://www.city.hamura.tokyo.jp/0000002764.html",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "あきる野市": {
+        "zoning": {
+          "name": "あきる野市都市計画図",
+          "url": "https://www.city.akiruno.tokyo.jp/0000009839.html",
+          "pdf": true,
+          "embed": false
+        }
+      }
+    },
+    "神奈川県": {
+      "横浜市": {
+        "zoning": {
+          "name": "i-マッピー（用途地域・都市計画情報）",
+          "url": "https://wwwm.city.yokohama.lg.jp/yokohama/Map?mid=2&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "i-マッピー（建築基準法の道路種別）",
+          "url": "https://wwwm.city.yokohama.lg.jp/yokohama/Map?mid=2&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "sediment": {
+          "name": "i-マッピー わいわい防災マップ（土砂災害）",
+          "url": "https://wwwm.city.yokohama.lg.jp/yokohama/Map?mid=63&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "川崎市": {
+        "zoning": {
+          "name": "ガイドマップかわさき",
+          "url": "https://kawasaki.geocloud.jp/webgis/?bt=0&p=1"
+        },
+        "road": {
+          "name": "ガイドマップかわさき（指定道路）",
+          "url": "https://kawasaki.geocloud.jp/webgis/?bt=0&p=1"
+        }
+      },
+      "相模原市": {
+        "zoning": {
+          "name": "さがみはら地図情報",
+          "url": "https://sagamihara.geocloud.jp/webgis/s"
+        },
+        "road": {
+          "name": "さがみはら地図情報（指定道路図）",
+          "url": "https://sagamihara.geocloud.jp/webgis/s"
+        }
+      },
+      "横須賀市": {
+        "zoning": {
+          "name": "よこすか わが街ガイド（都市計画・まちづくり）",
+          "url": "https://www2.wagmap.jp/yokosuka/Map?mid=5&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "よこすか わが街ガイド（建築基準法道路（指定道路図））",
+          "url": "https://www2.wagmap.jp/yokosuka/Map?mid=6&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "sediment": {
+          "name": "よこすか わが街ガイド（土砂災害警戒区域）",
+          "url": "https://www2.wagmap.jp/yokosuka/PositionSelect?mid=10",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "平塚市": {
+        "zoning": {
+          "name": "ひらつかわくわくマップ",
+          "url": "http://webgis.alandis.jp/hiratsuka14/"
+        },
+        "road": {
+          "name": "ひらつかわくわくマップ（建築基準法の道路）",
+          "url": "http://webgis.alandis.jp/hiratsuka14/"
+        }
+      },
+      "鎌倉市": {
+        "zoning": {
+          "name": "かまくらわが街マップ（都市計画情報マップ）",
+          "url": "https://www2.wagmap.jp/kamakura-hazard/Map?mid=231&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "藤沢市": {
+        "zoning": {
+          "name": "ふじさわキュンマップ",
+          "url": "https://webgis.alandis.jp/fujisawa14/portal/index.html",
+          "embed": false
+        },
+        "road": {
+          "name": "ふじさわキュンマップ（指定道路）",
+          "url": "https://webgis.alandis.jp/fujisawa14/portal/index.html",
+          "embed": false
+        }
+      },
+      "小田原市": {
+        "zoning": {
+          "name": "Navi-O 小田原市地理情報システム（都市計画図）",
+          "url": "https://www2.wagmap.jp/navi-odawara/Map?mid=6&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "Navi-O 小田原市地理情報システム（指定道路図）",
+          "url": "https://www2.wagmap.jp/navi-odawara/Map?mid=100&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "sediment": {
+          "name": "Navi-O 小田原市地理情報システム（土砂災害マップ）",
+          "url": "https://www2.wagmap.jp/navi-odawara-sp"
+        }
+      },
+      "茅ヶ崎市": {
+        "zoning": {
+          "name": "まっぷdeちがさき（都市計画図）",
+          "url": "https://www2.wagmap.jp/chigasaki/Map?mid=13&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "まっぷdeちがさき（指定道路図）",
+          "url": "https://www2.wagmap.jp/chigasaki/Map?mid=15&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "sediment": {
+          "name": "まっぷdeちがさき（洪水・土砂災害防災マップ）",
+          "url": "https://www2.wagmap.jp/chigasaki/Map?mid=75&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+        }
+      },
+      "逗子市": {
+        "zoning": {
+          "name": "逗子市オンラインマップ",
+          "url": "https://zushimap-zushicity.hub.arcgis.com/"
+        }
+      },
+      "三浦市": {
+        "zoning": {
+          "name": "みうらわが街ガイド",
+          "url": "https://www2.wagmap.jp/miura-sp/MapPage?dtp=2&flgInit=1&vpc=0"
+        },
+        "sediment": {
+          "name": "みうらわが街ガイド（土砂災害マップ）",
+          "url": "https://www2.wagmap.jp/miura-sp/MapPage?dtp=2&flgInit=1&vpc=0"
+        }
+      },
+      "秦野市": {
+        "zoning": {
+          "name": "はだのWEBマップ（都市計画情報）",
+          "url": "https://www2.wagmap.jp/hadano/Map?mid=3&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "はだのWEBマップ（指定道路種別（建築基準法道路））",
+          "url": "https://www2.wagmap.jp/hadano/Map?mid=17&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "厚木市": {
+        "zoning": {
+          "name": "厚木タウンマップ（都市計画情報）",
+          "url": "https://www2.wagmap.jp/atsugi/Map?mid=2&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "厚木タウンマップ（建築基準法道路マップ）",
+          "url": "https://www2.wagmap.jp/atsugi/Map?mid=4&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "大和市": {
+        "zoning": {
+          "name": "大和市都市計画マップ",
+          "url": "https://www.machi-info.jp/machikado/yamato_city/consentpage/gis-toshi.html"
+        },
+        "road": {
+          "name": "大和市指定道路マップ",
+          "url": "https://www.machi-info.jp/machikado/yamato_city/consentpage/gis-road.html"
+        }
+      },
+      "伊勢原市": {
+        "zoning": {
+          "name": "いせはらWebMaps（都市計画情報）",
+          "url": "https://www2.wagmap.jp/isehara/Map?mid=10&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "海老名市": {
+        "zoning": {
+          "name": "i-MAP わが街海老名ガイド（都市計画情報）",
+          "url": "https://www2.wagmap.jp/ebina/Map?mid=2&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "座間市": {
+        "zoning": {
+          "name": "座間市わが街ガイド",
+          "url": "https://www2.wagmap.jp/zama-sp/MapPage?dtp=2&flgInit=1&vpc=0"
+        },
+        "sediment": {
+          "name": "座間市わが街ガイド（土砂災害マップ）",
+          "url": "https://www2.wagmap.jp/zama-sp/MapPage?dtp=2&flgInit=1&vpc=0"
+        }
+      },
+      "南足柄市": {
+        "zoning": {
+          "name": "南足柄市地理情報システム（都市計画図）",
+          "url": "https://www2.wagmap.jp/minamiashigara/Map?mid=6&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "sediment": {
+          "name": "南足柄市地理情報システム（土砂災害マップ）",
+          "url": "https://www2.wagmap.jp/minamiashigara-sp/"
+        }
+      },
+      "綾瀬市": {
+        "zoning": {
+          "name": "あやせびゅ～まっぷ（都市計画マップ）",
+          "url": "https://www2.wagmap.jp/ayasecity/Map?mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+        }
+      },
+      "葉山町": {
+        "zoning": {
+          "name": "はやまMap（都市計画マップ）",
+          "url": "https://www2.wagmap.jp/hayama/Map?mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+        },
+        "sediment": {
+          "name": "はやまMap（葉山町土砂災害ハザードマップ）",
+          "url": "https://www2.wagmap.jp/hayama/Map?mid=11&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "大磯町": {
+        "sediment": {
+          "name": "おおいそオンラインマップ",
+          "url": "https://oisomap-oisotown.hub.arcgis.com/"
+        }
+      },
+      "中井町": {
+        "zoning": {
+          "name": "中井町地理情報ポータル",
+          "url": "https://webgis.alandis.jp/nakai14/portal/",
+          "embed": false
+        },
+        "sediment": {
+          "name": "中井町地理情報ポータル（土砂災害・洪水ハザードマップ）",
+          "url": "https://webgis.alandis.jp/nakai14/portal/",
+          "embed": false
+        }
+      },
+      "湯河原町": {
+        "zoning": {
+          "name": "湯河原町地理情報システム（都市計画）",
+          "url": "https://www2.wagmap.jp/yugawara/Map?mid=19&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      }
+    },
+    "千葉県": {
+      "千葉市": {
+        "zoning": {
+          "name": "千葉市地図情報システム",
+          "url": "https://webgis.alandis.jp/chiba12/portal/"
+        },
+        "road": {
+          "name": "千葉市地図情報システム",
+          "url": "https://webgis.alandis.jp/chiba12/portal/"
+        },
+        "sediment": {
+          "name": "ちばしのマップ（土砂災害ハザードマップ）",
+          "url": "https://www2.wagmap.jp/chibacity/Map?mid=4&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "市川市": {
+        "zoning": {
+          "name": "いち案内（市川市地図情報システム）",
+          "url": "https://gis.city.ichikawa.lg.jp/webgis/"
+        },
+        "road": {
+          "name": "いち案内（市川市地図情報システム）",
+          "url": "https://gis.city.ichikawa.lg.jp/webgis/"
+        }
+      },
+      "船橋市": {
+        "zoning": {
+          "name": "船橋市IKIIKIふれあいマップ",
+          "url": "https://webgis.alandis.jp/funabashi12/portal/",
+          "embed": false
+        },
+        "sediment": {
+          "name": "船橋市ハザードマップ",
+          "url": "https://www.city.funabashi.lg.jp/bousai/hazardmap/"
+        }
+      },
+      "木更津市": {
+        "zoning": {
+          "name": "きさNAVI（都市計画情報）",
+          "url": "https://www2.wagmap.jp/kisarazu/Map?mid=5&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "松戸市": {
+        "zoning": {
+          "name": "やさシティマップ（松戸市地図情報提供サービス）",
+          "url": "https://www.sonicweb-asp.jp/matsudo/"
+        },
+        "road": {
+          "name": "やさシティマップ（指定道路）",
+          "url": "https://www.sonicweb-asp.jp/matsudo/"
+        }
+      },
+      "野田市": {
+        "zoning": {
+          "name": "野田市都市計画図",
+          "url": "http://www2.city.noda.chiba.jp/area/tosikeikaku/htdocs/map.html",
+          "embed": false
+        }
+      },
+      "茂原市": {
+        "zoning": {
+          "name": "茂原市わが街ガイド（都市計画）",
+          "url": "https://www2.wagmap.jp/mobara/Map?mid=8&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "sediment": {
+          "name": "茂原市わが街ガイド",
+          "url": "https://www2.wagmap.jp/mobara/Portal"
+        }
+      },
+      "成田市": {
+        "zoning": {
+          "name": "なりた地図情報（都市計画情報）",
+          "url": "https://www2.wagmap.jp/narita/Map?mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+        },
+        "road": {
+          "name": "なりた地図情報（指定道路情報）",
+          "url": "https://www2.wagmap.jp/narita/Map?mid=4&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "sediment": {
+          "name": "なりた地図情報",
+          "url": "https://www2.wagmap.jp/narita/Portal"
+        }
+      },
+      "佐倉市": {
+        "zoning": {
+          "name": "佐倉市都市計画図（全体図）",
+          "url": "https://www.city.sakura.lg.jp/material/files/group/43/R7-20000.pdf",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "東金市": {
+        "zoning": {
+          "name": "東金市都市計画図",
+          "url": "https://www.city.togane.chiba.jp/tokeizu/map.html",
+          "embed": false
+        }
+      },
+      "旭市": {
+        "zoning": {
+          "name": "旭市都市計画図",
+          "url": "https://www.city.asahi.lg.jp/soshiki/17/2813.html",
+          "embed": false
+        }
+      },
+      "習志野市": {
+        "zoning": {
+          "name": "習志野市用途地域マップ",
+          "url": "https://www.city.narashino.lg.jp/section/townmap/youto2/youto_index2.html"
+        }
+      },
+      "柏市": {
+        "zoning": {
+          "name": "柏市公開型GIS",
+          "url": "https://www.sonicweb-asp.jp/kashiwa/"
+        }
+      },
+      "市原市": {
+        "zoning": {
+          "name": "いちはらマップ",
+          "url": "https://www2.city-gis.ichihara.chiba.jp/ichihara/alandis/webgis/index.php/autologin_jswebgis?ap=jsWebGIS&li=5&m=2&rs=3857&s=5000&u=guest05",
+          "embed": false
+        }
+      },
+      "流山市": {
+        "zoning": {
+          "name": "流山市都市計画情報",
+          "url": "https://webgis.alandis.jp/nagareyama12/portal/"
+        },
+        "road": {
+          "name": "流山市都市計画情報",
+          "url": "https://webgis.alandis.jp/nagareyama12/portal/"
+        }
+      },
+      "八千代市": {
+        "zoning": {
+          "name": "八千代都市計画図",
+          "url": "https://www.city.yachiyo.lg.jp/uploaded/attachment/34942.pdf",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "我孫子市": {
+        "zoning": {
+          "name": "あびまっぷ",
+          "url": "https://abiko.geocloud.jp/webgis/"
+        },
+        "road": {
+          "name": "あびまっぷ",
+          "url": "https://abiko.geocloud.jp/webgis/"
+        },
+        "sediment": {
+          "name": "あびまっぷ",
+          "url": "https://abiko.geocloud.jp/webgis/"
+        }
+      },
+      "鴨川市": {
+        "sediment": {
+          "name": "鴨川市防災マップWEBサイト",
+          "url": "https://www.city.kamogawa.lg.jp/hazardmap/",
+          "embed": false
+        }
+      },
+      "鎌ケ谷市": {
+        "zoning": {
+          "name": "鎌ケ谷都市計画図",
+          "url": "https://www.city.kamagaya.chiba.jp/sesakumidashi/sesaku-toshikeikak/toshikeikaku/tosikeikakuzu.files/r7tosikeikakuzu.pdf",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "君津市": {
+        "zoning": {
+          "name": "君津都市計画図",
+          "url": "https://www.city.kimitsu.lg.jp/toshikeikaku/map/std/index.html",
+          "embed": false
+        }
+      },
+      "浦安市": {
+        "zoning": {
+          "name": "浦安市公開型GIS（都市計画図）",
+          "url": "https://www.sonicweb-asp.jp/urayasu/"
+        },
+        "road": {
+          "name": "浦安市公開型GIS（指定道路図）",
+          "url": "https://www.sonicweb-asp.jp/urayasu/"
+        }
+      },
+      "四街道市": {
+        "zoning": {
+          "name": "四街道市地図情報システム",
+          "url": "https://webgis.alandis.jp/yotsukaido12/portal/"
+        },
+        "road": {
+          "name": "四街道市地図情報システム",
+          "url": "https://webgis.alandis.jp/yotsukaido12/portal/"
+        },
+        "sediment": {
+          "name": "四街道市地図情報システム",
+          "url": "https://webgis.alandis.jp/yotsukaido12/portal/"
+        }
+      },
+      "袖ケ浦市": {
+        "zoning": {
+          "name": "そでMAP（都市計画情報）",
+          "url": "https://www2.wagmap.jp/sodegaura/Map?mid=913&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "そでMAP",
+          "url": "https://www2.wagmap.jp/sodegaura/Portal"
+        },
+        "sediment": {
+          "name": "そでMAP（土砂災害警戒区域等マップ）",
+          "url": "https://www2.wagmap.jp/sodegaura/Map?mid=914&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "八街市": {
+        "zoning": {
+          "name": "八街都市計画図",
+          "url": "https://www.city.yachimata.lg.jp/uploaded/attachment/14280.pdf",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "印西市": {
+        "zoning": {
+          "name": "印西市わが街ガイド（都市計画情報）",
+          "url": "https://www2.wagmap.jp/inzai/Map?mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+        },
+        "sediment": {
+          "name": "印西市わが街ガイド（洪水・土砂災害ハザードマップ）",
+          "url": "https://www2.wagmap.jp/inzai/Map?mid=7&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "白井市": {
+        "zoning": {
+          "name": "白井市都市計画図",
+          "url": "https://www.city.shiroi.chiba.jp/material/files/group/38/r7toshikeikakuzu.pdf",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "富里市": {
+        "zoning": {
+          "name": "富里市まちづくり地図情報システム",
+          "url": "https://webgis.alandis.jp/tomisato12/portal/"
+        }
+      },
+      "南房総市": {
+        "zoning": {
+          "name": "南房総市いいとこマップ",
+          "url": "https://www2.wagmap.jp/minamiboso/Portal"
+        },
+        "sediment": {
+          "name": "南房総市いいとこマップ",
+          "url": "https://www2.wagmap.jp/minamiboso/Portal"
+        }
+      },
+      "香取市": {
+        "zoning": {
+          "name": "かとり地図GIS",
+          "url": "https://katori-gis.geocloud.jp/webgis/"
+        },
+        "sediment": {
+          "name": "かとり地図GIS",
+          "url": "https://katori-gis.geocloud.jp/webgis/"
+        }
+      },
+      "山武市": {
+        "zoning": {
+          "name": "山武市都市計画情報",
+          "url": "https://www2.wagmap.jp/sammu/Portal",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "sediment": {
+          "name": "山武市都市計画情報",
+          "url": "https://www2.wagmap.jp/sammu/Portal",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "大網白里市": {
+        "zoning": {
+          "name": "大網白里市都市計画図",
+          "url": "https://www.city.oamishirasato.lg.jp/tokeizu/map.html"
+        }
+      },
+      "銚子市": {
+        "zoning": {
+          "name": "銚子市都市計画情報システム",
+          "url": "https://webgis.alandis.jp/choshi12/portal/"
+        }
+      },
+      "横芝光町": {
+        "zoning": {
+          "name": "横芝光町地図情報システム（都市計画情報）",
+          "url": "https://www2.wagmap.jp/yokoshibahikari/Map?mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+        },
+        "sediment": {
+          "name": "横芝光町地図情報システム（洪水・土砂災害）",
+          "url": "https://www2.wagmap.jp/yokoshibahikari/Map?mid=30&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "一宮町": {
+        "zoning": {
+          "name": "一宮なみまちマップ（都市計画情報）",
+          "url": "https://www2.wagmap.jp/ichinomiya/Map?mid=11&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "一宮なみまちマップ",
+          "url": "https://www2.wagmap.jp/ichinomiya/Portal"
+        },
+        "sediment": {
+          "name": "一宮なみまちマップ（洪水・土砂災害ハザードマップ）",
+          "url": "https://www2.wagmap.jp/ichinomiya/Map?mid=13&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "東庄町": {
+        "zoning": {
+          "name": "とうのしょうマップ",
+          "url": "https://www.sonicweb-asp.jp/tonosho/"
+        }
+      }
+    },
+    "埼玉県": {
+      "さいたま市": {
+        "zoning": {
+          "name": "さいたま市地図情報（都市計画情報）",
+          "url": "https://www.sonicweb-asp.jp/saitama/map?theme=th_33"
+        },
+        "road": {
+          "name": "さいたま市地図情報（指定道路図）",
+          "url": "https://www.sonicweb-asp.jp/saitama/map?theme=th_45"
+        },
+        "sediment": {
+          "name": "さいたま市地図情報（土砂災害ハザードマップ）",
+          "url": "https://www.sonicweb-asp.jp/saitama/map?theme=th_80"
+        }
+      },
+      "川越市": {
+        "zoning": {
+          "name": "小江戸川越マップ（都市計画マップ）",
+          "url": "https://www2.wagmap.jp/kawagoe/Map?mid=2&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "熊谷市": {
+        "zoning": {
+          "name": "くまっぷ（都市計画情報）",
+          "url": "https://www2.wagmap.jp/kumagaya/Map?mid=20&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "くまっぷ（位置指定道路情報）",
+          "url": "https://www2.wagmap.jp/kumagaya/Map?mid=170&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "川口市": {
+        "zoning": {
+          "name": "かわぐち案内マップ",
+          "url": "https://kawaguchi.geocloud.jp/webgis/?p=1",
+          "embed": false
+        },
+        "road": {
+          "name": "かわぐち案内マップ（指定道路マップ）",
+          "url": "https://kawaguchi.geocloud.jp/webgis/?p=1",
+          "embed": false
+        }
+      },
+      "行田市": {
+        "zoning": {
+          "name": "ぎょうだマップ（GyodaMap）",
+          "url": "https://map-gyoda-city.hub.arcgis.com/"
+        }
+      },
+      "所沢市": {
+        "zoning": {
+          "name": "所沢市地理情報システム",
+          "url": "https://webgis.alandis.jp/tokorozawa11/alandis/portal/"
+        },
+        "sediment": {
+          "name": "所沢市地理情報システム",
+          "url": "https://webgis.alandis.jp/tokorozawa11/alandis/portal/"
+        }
+      },
+      "飯能市": {
+        "zoning": {
+          "name": "飯能市GIS（都市計画情報）",
+          "url": "https://webgis.alandis.jp/hanno11/210/portal/city-planning/index.html",
+          "embed": false
+        },
+        "road": {
+          "name": "飯能市GIS（指定道路図）",
+          "url": "https://webgis.alandis.jp/hanno11/210/portal/main/index.html",
+          "embed": false
+        },
+        "sediment": {
+          "name": "飯能市GIS（防災情報）",
+          "url": "https://webgis.alandis.jp/hanno11/210/portal/main/index.html",
+          "embed": false
+        }
+      },
+      "加須市": {
+        "zoning": {
+          "name": "かぞまっぷ（都市計画情報）",
+          "url": "https://www2.wagmap.jp/kazo/Map?mid=27&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "本庄市": {
+        "zoning": {
+          "name": "ほんじょうマップ（都市計画情報）",
+          "url": "https://www2.wagmap.jp/honjo/Map?mid=5&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "ほんじょうマップ（位置指定道路）",
+          "url": "https://www2.wagmap.jp/honjo/Map?mid=10&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "東松山市": {
+        "zoning": {
+          "name": "東松山市都市計画図",
+          "url": "https://www.city.higashimatsuyama.lg.jp/uploaded/attachment/18877.pdf",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "春日部市": {
+        "zoning": {
+          "name": "かすかべオラナビ（公開型地理情報システム）",
+          "url": "https://kasukabe.geocloud.jp/"
+        }
+      },
+      "狭山市": {
+        "zoning": {
+          "name": "さやまちマップ",
+          "url": "https://www.sonicweb-asp.jp/sayama/"
+        }
+      },
+      "羽生市": {
+        "zoning": {
+          "name": "羽生市都市計画デジタルマップ",
+          "url": "https://www.sonicweb-asp.jp/hanyu/"
+        }
+      },
+      "鴻巣市": {
+        "zoning": {
+          "name": "こうのとりっぷ",
+          "url": "https://www.sonicweb-asp.jp/konosu/"
+        }
+      },
+      "深谷市": {
+        "zoning": {
+          "name": "ふかやMap",
+          "url": "https://fukaya.geocloud.jp/"
+        }
+      },
+      "上尾市": {
+        "zoning": {
+          "name": "あげおガイド アピマップ（都市計画図）",
+          "url": "https://www2.wagmap.jp/ageocity/Map?mid=8&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "あげおガイド アピマップ（指定道路図(建築基準法道路種別)）",
+          "url": "https://www2.wagmap.jp/ageocity/Map?mid=9&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "草加市": {
+        "zoning": {
+          "name": "草加市都市計画情報提供システム",
+          "url": "https://webgis.alandis.jp/soka11/portal/"
+        }
+      },
+      "越谷市": {
+        "zoning": {
+          "name": "こしがや住まいるマップ（都市計画情報）",
+          "url": "https://www2.wagmap.jp/koshigayacity/Map?mid=9&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "こしがや住まいるマップ（建築基準法上の道路種別）",
+          "url": "https://www2.wagmap.jp/koshigayacity/Map?mid=31&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "蕨市": {
+        "zoning": {
+          "name": "蕨都市計画総括図",
+          "url": "https://www.city.warabi.saitama.jp/_res/projects/default_project/_page_/001/003/027/soukatsuzu051006.pdf",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "戸田市": {
+        "zoning": {
+          "name": "いいとだマップ（都市計画情報）",
+          "url": "https://e-toda.kukanjoho.jp/webgis/?p=1"
+        }
+      },
+      "入間市": {
+        "zoning": {
+          "name": "いるまっぷ",
+          "url": "https://www2.wagmap.jp/iruma/Portal"
+        }
+      },
+      "朝霞市": {
+        "zoning": {
+          "name": "朝霞市地理情報システム（都市計画決定）",
+          "url": "https://www2.wagmap.jp/asaka/Map?mps={mps}&mpx={lon}&mpy={lat}&mtp=dm"
+        }
+      },
+      "志木市": {
+        "zoning": {
+          "name": "志木市都市計画図",
+          "url": "https://www.city.shiki.lg.jp/uploaded/attachment/22759.pdf",
+          "pdf": true,
+          "embed": false
+        },
+        "road": {
+          "name": "志木市指定道路図",
+          "url": "https://www.city.shiki.lg.jp/soshiki/30/1719.html",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "新座市": {
+        "zoning": {
+          "name": "にいざマップ（都市計画情報）",
+          "url": "https://www2.wagmap.jp/niiza/Map?mid=27&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "にいざマップ（建築基準法指定道路図）",
+          "url": "https://www2.wagmap.jp/niiza/Map?mid=25&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "sediment": {
+          "name": "にいざマップ（洪水・土砂災害ハザードマップ）",
+          "url": "https://www2.wagmap.jp/niiza/Map?mid=10&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "桶川市": {
+        "zoning": {
+          "name": "おけがわインフラマップ",
+          "url": "https://okegawa.cloudgis.jp/"
+        }
+      },
+      "久喜市": {
+        "zoning": {
+          "name": "久喜市都市計画図（全域）",
+          "url": "https://www.city.kuki.lg.jp/_res/projects/default_project/_page_/001/005/189/1005189_001.pdf",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "北本市": {
+        "zoning": {
+          "name": "北本市都市計画図",
+          "url": "https://www.city.kitamoto.lg.jp/material/files/group/32/kitamoto_toshikeikakuzu.pdf",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "八潮市": {
+        "zoning": {
+          "name": "八潮市都市計画情報システム",
+          "url": "https://open-map.jp/saitama-yashio/",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        },
+        "road": {
+          "name": "八潮市都市計画情報システム",
+          "url": "https://open-map.jp/saitama-yashio/",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "富士見市": {
+        "zoning": {
+          "name": "富士見市都市計画図",
+          "url": "https://www.city.fujimi.saitama.jp/kurashi_tetsuzuki/sumai/plan/2010-0521-1608-141.files/r6toshikekakuzu.pdf",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "三郷市": {
+        "zoning": {
+          "name": "三郷市地図情報システム",
+          "url": "https://www.sonicweb-asp.jp/misato/"
+        }
+      },
+      "蓮田市": {
+        "zoning": {
+          "name": "蓮田市地図情報システム",
+          "url": "https://www.sonicweb-asp.jp/hasuda/"
+        }
+      },
+      "坂戸市": {
+        "zoning": {
+          "name": "e-マップさかど",
+          "url": "https://sakado.geogeo.jp/"
+        },
+        "road": {
+          "name": "e-マップさかど",
+          "url": "https://sakado.geogeo.jp/"
+        }
+      },
+      "鶴ヶ島市": {
+        "zoning": {
+          "name": "つるがしまっぷ（都市計画情報）",
+          "url": "https://www2.wagmap.jp/tsurugashima/Map?mid=40&mps={mps}&mpx={lon}&mpy={lat}&mtp=dm",
+          "embed": false,
+          "note": "別タブで開き「同意する」を押すと地図が表示されます（外部ページへの埋め込みでは同意が保存されません）。"
+        }
+      },
+      "日高市": {
+        "zoning": {
+          "name": "ひだかマップ",
+          "url": "https://hidaka-hub-hidaka-city.hub.arcgis.com/"
+        }
+      },
+      "吉川市": {
+        "zoning": {
+          "name": "吉川市都市計画図",
+          "url": "https://www.city.yoshikawa.saitama.jp/index.cfm/27,974,c,html/974/20260106-133657.pdf",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "ふじみ野市": {
+        "zoning": {
+          "name": "ふじみ野市地域地区図",
+          "url": "https://www.city.fujimino.saitama.jp/material/files/group/28/tokeizuR0841.pdf",
+          "pdf": true,
+          "embed": false
+        }
+      },
+      "白岡市": {
+        "zoning": {
+          "name": "しらおか地図情報サービス",
+          "url": "https://shiraoka.geocloud.jp/"
+        }
+      },
+      "三芳町": {
+        "zoning": {
+          "name": "三芳町地理情報システム（都市計画情報）",
+          "url": "https://webgis.alandis.jp/miyoshi11/webgis/index.php/autologin_jswebgis?u=toshi&ap=jsWebGIS&m=2",
+          "embed": false
+        },
+        "sediment": {
+          "name": "三芳町地理情報システム（ハザードマップ）",
+          "url": "https://www.town.saitama-miyoshi.lg.jp/gis-portal/map01.html",
+          "embed": false
+        }
+      },
+      "伊奈町": {
+        "zoning": {
+          "name": "inadouroGIS（伊奈町公開型GIS）",
+          "url": "https://inadourogis-ina.hub.arcgis.com/"
+        }
+      },
+      "上里町": {
+        "zoning": {
+          "name": "上里町地図情報システム（かみさとオープンGIS）",
+          "url": "https://www.sonicweb-asp.jp/kamisato/"
+        }
+      }
+    }
+  }
+}

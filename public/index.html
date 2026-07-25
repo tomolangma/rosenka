@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>土地マップ — 地図から路線価図を表示</title>
+  <meta name="description" content="住所検索または地図クリックで、国税庁の路線価図PDFを表示します。">
+  <link rel="icon" href="/icon/main_icon.ico" type="image/x-icon">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Sans:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <img class="brand-icon" src="/icon/main_icon.ico" width="28" height="28" alt=""
+             onerror="this.onerror=null;this.src='/icon/main_icon.png'">
+        <h1>土地マップ</h1>
+      </div>
+      <input id="rkAddr" type="text" placeholder="住所を入力（例: 神奈川県横浜市港北区新横浜二丁目）" autofocus autocomplete="street-address">
+      <button class="btn-search" id="rkGo" type="button">表示</button>
+    </header>
+
+    <div class="rk-split">
+      <div class="rk-mapwrap">
+        <div id="rkmap"></div>
+      </div>
+      <div class="rk-right">
+        <nav class="rk-tabs" aria-label="右ペインの表示切替">
+          <button type="button" class="rk-tab on" data-tab="rosenka">路線価図</button>
+          <button type="button" class="rk-tab" data-tab="gmap">Googleマップ</button>
+          <button type="button" class="rk-tab" data-tab="maps">関連マップ</button>
+          <button type="button" class="rk-tab" data-tab="other">その他</button>
+        </nav>
+
+        <div class="rk-tabpane on" id="tab-rosenka" data-tabpane="rosenka">
+          <div class="rk-yearbar" id="rkYearToggle" style="display:none" title="年度を切り替えて時点比較">
+            <div class="rk-years" id="rkYearList"></div>
+          </div>
+          <div class="rk-pdfbar">
+            <a class="btn-mini" id="rkPdfNew" href="#" style="display:none" title="PDFを開く／隣接図と切り貼り">PDF</a>
+            <a class="btn-mini" id="rkNta" target="_blank" rel="noopener" style="display:none" title="国税庁の路線価図ページを開く">国税庁</a>
+            <a class="btn-mini" id="rkRatio" target="_blank" rel="noopener" style="display:none" title="評価倍率表を開く">倍率表</a>
+            <a class="btn-mini" id="rkZosei" target="_blank" rel="noopener" style="display:none" title="宅地造成費の金額表を開く">宅地造成費</a>
+          </div>
+          <div id="rkempty">左の地図をクリックすると<br>その場所の路線価図PDFを表示します</div>
+          <div id="rkpdf" style="display:none">
+            <div class="pv-wrap" id="pvWrap"><canvas id="pvCanvas"></canvas></div>
+            <div class="pv-controls" id="pvControls">
+              <div class="pv-zoom" id="pvZoom">
+                <button id="pvZin" type="button" title="拡大">＋</button>
+                <button id="pvZout" type="button" title="縮小">－</button>
+                <button id="pvFitBtn" type="button" title="全体表示に戻す">⤢</button>
+              </div>
+              <div class="rk-dirpad" id="rkDirpad" style="display:none" title="隣の路線価図へ移動">
+                <button type="button" data-dir="w" title="西" aria-label="西">←</button>
+                <span class="ns">
+                  <button type="button" data-dir="n" title="北" aria-label="北">↑</button>
+                  <button type="button" data-dir="s" title="南" aria-label="南">↓</button>
+                </span>
+                <button type="button" data-dir="e" title="東" aria-label="東">→</button>
+              </div>
+            </div>
+            <div class="pv-load" id="pvLoad" style="display:none"><span class="spinner"></span> PDFを読み込み中…</div>
+            <iframe id="pvFrame" style="display:none" title="路線価図PDF"></iframe>
+          </div>
+        </div>
+
+        <div class="rk-tabpane" id="tab-gmap" data-tabpane="gmap">
+          <div class="gmap-pane">
+            <div class="gmap-toolbar">
+              <span class="gmap-scale" id="gmapScaleLabel">縮尺 約 1/500</span>
+              <span id="gmapPosLabel"></span>
+              <a id="gmapOpen" href="#" target="_blank" rel="noopener">Googleマップで開く</a>
+            </div>
+            <iframe id="gmapFrame" title="Googleマップ" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+          </div>
+        </div>
+        <div class="rk-tabpane" id="tab-maps" data-tabpane="maps">
+          <div class="maps-hub" id="mapsHub">
+            <div class="maps-hub-head">
+              <div class="maps-hub-where" id="mapsHubWhere">地点を選択すると関連マップのリンクが表示されます</div>
+              <div class="maps-hub-coord" id="mapsHubCoord"></div>
+            </div>
+            <div class="maps-hub-list" id="mapsHubList"></div>
+          </div>
+        </div>
+        <div class="rk-tabpane" id="tab-other" data-tabpane="other">
+          <div class="settings-pane">
+            <form id="settingsForm" class="settings-form" autocomplete="off">
+              <section class="settings-section">
+                <h3>初期地図位置</h3>
+                <p class="settings-lead">起動時に表示する地点です。<code>config/settings.json</code> に保存されます。</p>
+                <div class="settings-grid">
+                  <label>緯度 <input name="mapLat" type="number" step="any" required></label>
+                  <label>経度 <input name="mapLon" type="number" step="any" required></label>
+                  <label>ズーム <input name="mapZoom" type="number" min="1" max="18" step="1" required></label>
+                  <label class="settings-span2">ラベル <input name="mapLabel" type="text" maxlength="80"></label>
+                </div>
+                <button type="button" class="btn-settings-secondary" id="settingsUseCurrent">現在の地図位置を入れる</button>
+              </section>
+              <section class="settings-section">
+                <h3>Googleマップ</h3>
+                <div class="settings-grid">
+                  <label>目標縮尺（分母） <input name="gmapScale" type="number" min="100" max="100000" step="1" required></label>
+                  <label class="settings-check"><input name="gmapLabels" type="checkbox"> ラベル表示を既定ON</label>
+                </div>
+              </section>
+              <section class="settings-section">
+                <h3>関連マップ（位置パラメータ）</h3>
+                <p class="settings-lead">URLに <code>{z}</code> / <code>{mps}</code> がある地図へ送る既定値です。</p>
+                <div class="settings-grid">
+                  <label>ズーム {z} <input name="gisZoom" type="number" min="1" max="20" step="1" required></label>
+                  <label>縮尺分母 {mps} <input name="gisMps" type="number" min="100" max="100000" step="1" required></label>
+                </div>
+              </section>
+              <div class="settings-actions">
+                <button type="submit" class="btn-settings-primary">保存して適用</button>
+                <span class="settings-status" id="settingsStatus" aria-live="polite"></span>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer">
+      出典: <a href="https://www.rosenka.nta.go.jp/" target="_blank" rel="noopener">国税庁 路線価図・評価倍率表</a>
+      ／ <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル・ジオコーダ</a>
+    </footer>
+  </div>
+
+  <dialog id="rkStitchDlg" class="rk-dialog">
+    <form method="dialog" id="rkStitchForm">
+      <h3>PDFの出力</h3>
+      <p class="rk-dialog-lead">結合する方向を選んでください。地図部分だけを切り貼りし、元の1枚と同じ用紙サイズで保存します。</p>
+      <div class="rk-stitch-pad" role="group" aria-label="結合方向">
+        <button type="submit" name="dir" value="nw" data-need="nw">↖ 北西</button>
+        <button type="submit" name="dir" value="n" data-need="n">↑ 北</button>
+        <button type="submit" name="dir" value="ne" data-need="ne">↗ 北東</button>
+        <button type="submit" name="dir" value="w" data-need="w">← 西</button>
+        <button type="submit" name="dir" value="" class="on">この図のみ</button>
+        <button type="submit" name="dir" value="e" data-need="e">東 →</button>
+        <button type="submit" name="dir" value="sw" data-need="sw">↙ 南西</button>
+        <button type="submit" name="dir" value="s" data-need="s">↓ 南</button>
+        <button type="submit" name="dir" value="se" data-need="se">↘ 南東</button>
+      </div>
+      <div class="rk-dialog-actions">
+        <button type="submit" name="dir" value="__cancel__" class="rk-dialog-cancel">キャンセル</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="rosenka-core.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
