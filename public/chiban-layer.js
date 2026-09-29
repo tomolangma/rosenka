@@ -423,7 +423,7 @@
     if (!want.length && cbVisible(b)) { cbDrawLabels(); note(''); return; }
     if (!want.length) {
       cb.labels.clearLayers();
-      note('この範囲は重ねられる地図データがありません（任意座標の公図のみの区域・未整備）');
+      note('');
       return;
     }
     if (want.some(m => !cb.cache[m])) note('筆界を読み込み中…');
@@ -435,10 +435,6 @@
       if (!cb.shown[m] && cb.cache[m]) { cb.shown[m] = cb.cache[m].g; cb.group.addLayer(cb.cache[m].g); }
     });
     cbDrawLabels();
-    if (!cbVisible(b)) {
-      note('この範囲は重ねられる地図データがありません（地籍調査が未了の区域）');
-      return;
-    }
     note('');
   }
 

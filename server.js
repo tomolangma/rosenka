@@ -16,6 +16,7 @@ const PORT = Number(process.env.PORT) || 5173;
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
 const SETTINGS_PATH = path.join(ROOT, 'config', 'settings.json');
+const PAST_CASES_PATH = path.join(ROOT, 'data', 'past-cases.json');
 const ALLOWED_HOSTS = new Set([
   'www.rosenka.nta.go.jp',
   'rosenka.nta.go.jp',
@@ -109,7 +110,7 @@ function safeJoin(base, reqPath) {
 function cacheFor(filePath) {
   const base = path.basename(filePath);
   const ext = path.extname(filePath).toLowerCase();
-  if (base === 'settings.json' || ext === '.html') return 'no-cache';
+  if (base === 'settings.json' || base === 'past-cases.json' || ext === '.html') return 'no-cache';
   if (base === 'maps.json') return 'public, max-age=600';
   if (ext === '.json') return 'public, max-age=300';
   if (ext === '.js' || ext === '.css') return 'public, max-age=86400';
@@ -237,6 +238,96 @@ async function handlePutSettings(req, res) {
   }
 }
 
+function emptyPastCases() {
+  return { version: 1, updated: null, items: [] };
+}
+
+function readPastCases() {
+  try {
+    const raw = fs.readFileSync(PAST_CASES_PATH, 'utf8');
+    const j = JSON.parse(raw || '{}');
+    if (!Array.isArray(j.items)) j.items = [];
+    if (!j.version) j.version = 1;
+    return j;
+  } catch (err) {
+    if (err && err.code === 'ENOENT') return emptyPastCases();
+    throw err;
+  }
+}
+
+function writePastCases(data) {
+  const dir = path.dirname(PAST_CASES_PATH);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(PAST_CASES_PATH, JSON.stringify(data, null, 2) + '\n', 'utf8');
+}
+
+function handleGetPastCases(res) {
+  try {
+    const data = readPastCases();
+    send(res, 200, JSON.stringify(data), {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-cache'
+    });
+  } catch (err) {
+    console.error('[past-cases get]', err.message);
+    send(res, 500, JSON.stringify({ error: 'past-cases read failed' }), {
+      'Content-Type': 'application/json; charset=utf-8'
+    });
+  }
+}
+
+async function handlePostPastCases(req, res) {
+  try {
+    const raw = await readBody(req, 64 * 1024);
+    const body = JSON.parse(raw.toString('utf8') || '{}');
+    const name = String(body.name == null ? '' : body.name).trim();
+    const kintoneUrl = String(body.kintoneUrl == null ? '' : body.kintoneUrl).trim();
+    const address = String(body.address == null ? '' : body.address).trim().slice(0, 200);
+    const building = String(body.building == null ? '' : body.building).trim().slice(0, 120);
+    const memo = String(body.memo == null ? '' : body.memo).trim().slice(0, 500);
+    const lat = Number(body.lat);
+    const lon = Number(body.lon);
+    if (!name) {
+      return send(res, 400, JSON.stringify({ error: '被相続人名が必要です' }), {
+        'Content-Type': 'application/json; charset=utf-8'
+      });
+    }
+    if (!kintoneUrl || !/^https?:\/\//i.test(kintoneUrl)) {
+      return send(res, 400, JSON.stringify({ error: '有効な kintone URL が必要です' }), {
+        'Content-Type': 'application/json; charset=utf-8'
+      });
+    }
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < 20 || lat > 46 || lon < 122 || lon > 154) {
+      return send(res, 400, JSON.stringify({ error: '緯度経度が不正です' }), {
+        'Content-Type': 'application/json; charset=utf-8'
+      });
+    }
+    const data = readPastCases();
+    const item = {
+      id: 'pc_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
+      lat,
+      lon,
+      name: name.slice(0, 80),
+      building,
+      kintoneUrl: kintoneUrl.slice(0, 500),
+      address,
+      memo,
+      createdAt: new Date().toISOString()
+    };
+    data.items.push(item);
+    data.updated = item.createdAt;
+    writePastCases(data);
+    send(res, 200, JSON.stringify({ item, items: data.items, updated: data.updated }), {
+      'Content-Type': 'application/json; charset=utf-8'
+    });
+  } catch (err) {
+    console.error('[past-cases post]', err.message);
+    send(res, 500, JSON.stringify({ error: 'past-cases write failed' }), {
+      'Content-Type': 'application/json; charset=utf-8'
+    });
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   const host = req.headers.host || `localhost:${PORT}`;
   const url = new URL(req.url || '/', `http://${host}`);
@@ -244,7 +335,7 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'OPTIONS') {
     return send(res, 204, '', {
-      'Access-Control-Allow-Methods': 'GET,PUT,OPTIONS',
+      'Access-Control-Allow-Methods': 'GET,PUT,POST,OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type'
     });
   }
@@ -258,6 +349,12 @@ const server = http.createServer(async (req, res) => {
   if (p === '/api/settings' && req.method === 'PUT') {
     return handlePutSettings(req, res);
   }
+  if (p === '/api/past-cases' && req.method === 'GET') {
+    return handleGetPastCases(res);
+  }
+  if (p === '/api/past-cases' && req.method === 'POST') {
+    return handlePostPastCases(req, res);
+  }
 
   // 静的ファイル
   let filePath = null;
@@ -267,6 +364,8 @@ const server = http.createServer(async (req, res) => {
     filePath = safeJoin(path.join(ROOT, 'icon'), p.slice('/icon/'.length));
   } else if (p.startsWith('/config/')) {
     filePath = safeJoin(path.join(ROOT, 'config'), p.slice('/config/'.length));
+  } else if (p.startsWith('/data/')) {
+    filePath = safeJoin(path.join(ROOT, 'data'), p.slice('/data/'.length));
   } else {
     filePath = safeJoin(PUBLIC, p);
   }

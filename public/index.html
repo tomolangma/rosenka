@@ -164,10 +164,39 @@
     </form>
   </dialog>
 
+  <dialog id="rkPastDlg" class="rk-dialog">
+    <form id="rkPastForm" class="rk-past-form">
+      <h3>過去案件の登録</h3>
+      <p class="rk-dialog-lead">評価したマンション・アパート・団地の地点を登録します。地図上に紫の点で表示されます。</p>
+      <p class="rk-past-pos" id="rkPastPos"></p>
+      <input type="hidden" name="lat">
+      <input type="hidden" name="lon">
+      <input type="hidden" name="address">
+      <label class="rk-past-field">被相続人名
+        <input name="name" type="text" maxlength="80" required autocomplete="name" placeholder="例: 山田太郎">
+      </label>
+      <label class="rk-past-field">マンション名
+        <input name="building" type="text" maxlength="120" placeholder="例: ○○マンション">
+      </label>
+      <label class="rk-past-field">kintone URL
+        <input name="kintoneUrl" type="url" maxlength="500" required placeholder="https://…">
+      </label>
+      <label class="rk-past-field">備考
+        <textarea name="memo" rows="3" maxlength="500" placeholder="任意"></textarea>
+      </label>
+      <div class="rk-dialog-actions rk-past-actions">
+        <span class="settings-status" id="rkPastStatus" aria-live="polite"></span>
+        <button type="button" class="rk-dialog-cancel" id="rkPastCancel">キャンセル</button>
+        <button type="submit" class="btn-settings-primary">登録する</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-  <script src="rosenka-core.js?v=48" defer></script>
-  <script src="app.js?v=48" defer></script>
-  <script src="chiban-layer.js?v=48" defer></script>
-  <script src="kouzu-view.js?v=48" defer></script>
+  <script src="rosenka-core.js?v=51" defer></script>
+  <script src="app.js?v=51" defer></script>
+  <script src="chiban-layer.js?v=51" defer></script>
+  <script src="kouzu-view.js?v=51" defer></script>
+  <script src="past-cases-layer.js?v=51" defer></script>
 </body>
 </html>
