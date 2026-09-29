@@ -7,7 +7,7 @@
   },
   "gmap": {
     "scale": 1500,
-    "labels": true
+    "labels": false
   },
   "gis": {
     "zoom": 16,

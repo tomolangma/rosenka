@@ -3,12 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>土地マップ — 地図から路線価図を表示</title>
-  <meta name="description" content="住所検索または地図クリックで、国税庁の路線価図PDFを表示します。">
-  <link rel="icon" href="/icon/main_icon.ico" type="image/x-icon">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Sans:wght@500;700&display=swap" rel="stylesheet">
+  <title>路線価チェッくん — 地図から路線価図を表示</title>
+  <meta name="description" content="住所・地番検索または地図クリックで、国税庁の路線価図PDFを表示します。">
+  <link rel="icon" href="/icon/ro_kanji.ico" type="image/x-icon">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -16,16 +13,19 @@
   <div class="app">
     <header class="topbar">
       <div class="brand">
-        <img class="brand-icon" src="/icon/main_icon.ico" width="28" height="28" alt=""
-             onerror="this.onerror=null;this.src='/icon/main_icon.png'">
-        <h1>土地マップ</h1>
+        <img class="brand-icon" src="/icon/ro_kanji.ico" width="28" height="28" alt="">
+        <h1>路線価チェッくん</h1>
       </div>
-      <input id="rkAddr" type="text" placeholder="住所を入力（例: 神奈川県横浜市港北区新横浜二丁目）" autofocus autocomplete="street-address">
+      <input id="rkAddr" type="text" placeholder="住所または地番（例: 横浜市港北区新横浜二丁目 / 港北区新横浜二丁目100番）" autofocus autocomplete="street-address">
       <button class="btn-search" id="rkGo" type="button">表示</button>
     </header>
 
     <div class="rk-split">
       <div class="rk-mapwrap">
+        <div class="rk-status" id="rkStatus" aria-live="polite">
+          <div class="rk-status-addr" id="rkStatusAddr">地点を選択すると住所を表示します</div>
+          <div class="rk-status-msg" id="rkStatusMsg">住所・地番を入力するか、地図をクリックしてください。</div>
+        </div>
         <div id="rkmap"></div>
       </div>
       <div class="rk-right">
@@ -33,7 +33,7 @@
           <button type="button" class="rk-tab on" data-tab="rosenka">路線価図</button>
           <button type="button" class="rk-tab" data-tab="gmap">Googleマップ</button>
           <button type="button" class="rk-tab" data-tab="maps">関連マップ</button>
-          <button type="button" class="rk-tab" data-tab="other">その他</button>
+          <button type="button" class="rk-tab" data-tab="settings">設定</button>
         </nav>
 
         <div class="rk-tabpane on" id="tab-rosenka" data-tabpane="rosenka">
@@ -41,10 +41,15 @@
             <div class="rk-years" id="rkYearList"></div>
           </div>
           <div class="rk-pdfbar">
+            <label class="rk-wardpick" id="rkWardPickWrap" style="display:none" title="同じ地点を含む特別区の路線価図から選択">
+              <span class="rk-wardpick-label">区・図</span>
+              <select id="rkWardPick" aria-label="特別区・路線価図の選択"></select>
+            </label>
             <a class="btn-mini" id="rkPdfNew" href="#" style="display:none" title="PDFを開く／隣接図と切り貼り">PDF</a>
             <a class="btn-mini" id="rkNta" target="_blank" rel="noopener" style="display:none" title="国税庁の路線価図ページを開く">国税庁</a>
             <a class="btn-mini" id="rkRatio" target="_blank" rel="noopener" style="display:none" title="評価倍率表を開く">倍率表</a>
             <a class="btn-mini" id="rkZosei" target="_blank" rel="noopener" style="display:none" title="宅地造成費の金額表を開く">宅地造成費</a>
+            <button type="button" class="btn-mini" id="vwChiban" style="display:none" title="この辺りの公図を開く（地図に重ねられない任意座標の図面はツール内で表示・地番で検索可）">公図（全域）</button>
           </div>
           <div id="rkempty">左の地図をクリックすると<br>その場所の路線価図PDFを表示します</div>
           <div id="rkpdf" style="display:none">
@@ -88,7 +93,7 @@
             <div class="maps-hub-list" id="mapsHubList"></div>
           </div>
         </div>
-        <div class="rk-tabpane" id="tab-other" data-tabpane="other">
+        <div class="rk-tabpane" id="tab-settings" data-tabpane="settings">
           <div class="settings-pane">
             <form id="settingsForm" class="settings-form" autocomplete="off">
               <section class="settings-section">
@@ -110,11 +115,15 @@
                 </div>
               </section>
               <section class="settings-section">
-                <h3>関連マップ（位置パラメータ）</h3>
-                <p class="settings-lead">URLに <code>{z}</code> / <code>{mps}</code> がある地図へ送る既定値です。</p>
+                <h3>関連マップ</h3>
+                <p class="settings-lead">URLに <code>{z}</code> / <code>{mps}</code> がある地図へ送る既定値と、位置固定なし地図の動作です。</p>
                 <div class="settings-grid">
                   <label>ズーム {z} <input name="gisZoom" type="number" min="1" max="20" step="1" required></label>
                   <label>縮尺分母 {mps} <input name="gisMps" type="number" min="100" max="100000" step="1" required></label>
+                  <label class="settings-check settings-span2">
+                    <input name="gisCopyAddr" type="checkbox">
+                    位置固定なしの地図を開くとき、現在地の住所をクリップボードへコピーする
+                  </label>
                 </div>
               </section>
               <div class="settings-actions">
@@ -130,6 +139,7 @@
     <footer class="footer">
       出典: <a href="https://www.rosenka.nta.go.jp/" target="_blank" rel="noopener">国税庁 路線価図・評価倍率表</a>
       ／ <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル・ジオコーダ</a>
+      ／ 筆界・地番・公図: 法務省 登記所備付地図データ（AIGID変換・CC BY）
     </footer>
   </div>
 
@@ -154,8 +164,39 @@
     </form>
   </dialog>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="rosenka-core.js"></script>
-  <script src="app.js"></script>
+  <dialog id="rkPastDlg" class="rk-dialog">
+    <form id="rkPastForm" class="rk-past-form">
+      <h3>過去案件の登録</h3>
+      <p class="rk-dialog-lead">評価したマンション・アパート・団地の地点を登録します。地図上に紫の点で表示されます。</p>
+      <p class="rk-past-pos" id="rkPastPos"></p>
+      <input type="hidden" name="lat">
+      <input type="hidden" name="lon">
+      <input type="hidden" name="address">
+      <label class="rk-past-field">被相続人名
+        <input name="name" type="text" maxlength="80" required autocomplete="name" placeholder="例: 山田太郎">
+      </label>
+      <label class="rk-past-field">マンション名
+        <input name="building" type="text" maxlength="120" placeholder="例: ○○マンション">
+      </label>
+      <label class="rk-past-field">kintone URL
+        <input name="kintoneUrl" type="url" maxlength="500" required placeholder="https://…">
+      </label>
+      <label class="rk-past-field">備考
+        <textarea name="memo" rows="3" maxlength="500" placeholder="任意"></textarea>
+      </label>
+      <div class="rk-dialog-actions rk-past-actions">
+        <span class="settings-status" id="rkPastStatus" aria-live="polite"></span>
+        <button type="button" class="rk-dialog-cancel" id="rkPastCancel">キャンセル</button>
+        <button type="submit" class="btn-settings-primary">登録する</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <script src="rosenka-core.js?v=51" defer></script>
+  <script src="app.js?v=51" defer></script>
+  <script src="chiban-layer.js?v=51" defer></script>
+  <script src="kouzu-view.js?v=51" defer></script>
+  <script src="past-cases-layer.js?v=51" defer></script>
 </body>
 </html>

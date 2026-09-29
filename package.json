@@ -1,16 +1,12 @@
 {
-  "name": "rosenka-map",
-  "version": "1.0.0",
+  "name": "rosenka-checkkun",
+  "version": "1.1.0",
   "private": true,
-  "description": "地図クリックで国税庁の路線価図PDFを表示するビューア",
+  "description": "路線価チェッくん — Node.js のみで動く路線価図ビューア（依存パッケージなし）",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server.js"
   },
   "engines": {
     "node": ">=18"
-  },
-  "dependencies": {
-    "express": "^4.21.2"
   }
 }

@@ -1,5 +1,7 @@
 'use strict';
 
+const $id = x => document.getElementById(x);
+
 /* localStorage キャッシュ（容量超過時は古い校正キャッシュを半分捨てて再試行） */
 const rkCache = {
   get: async k => {
@@ -26,26 +28,113 @@ const rkCache = {
   }
 };
 
-/* 旧校正キャッシュ（索引図ごとに縮尺が食い違い図郭がずれる）を破棄 */
+/* 旧校正キャッシュを破棄（初回のみ） */
 try {
-  Object.keys(localStorage)
-    .filter(k => /^rk_calib_main_/.test(k))
-    .forEach(k => localStorage.removeItem(k));
+  if (!localStorage.getItem('rk_purged_calib_v25')) {
+    Object.keys(localStorage)
+      .filter(k =>
+        /^rk_calib_/.test(k) ||
+        /^rk_geo_/.test(k) ||
+        /^rk_cities_/.test(k)
+      )
+      .forEach(k => localStorage.removeItem(k));
+    localStorage.setItem('rk_purged_calib_v25', '1');
+  }
 } catch (_) { /* ignore */ }
 
 const DEFAULT_MAP = { lat: 35.50715, lon: 139.61745, zoom: 15, label: '新横浜駅' };
 
-const rkMap = L.map('rkmap').setView([DEFAULT_MAP.lat, DEFAULT_MAP.lon], DEFAULT_MAP.zoom);
-L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', {
-  maxZoom: 18,
-  attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>'
-}).addTo(rkMap);
+const RK_TILE_ATTR = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>';
+const rkMap = L.map('rkmap', {
+  preferCanvas: true,
+  zoomControl: true,
+  maxZoom: 20
+}).setView([DEFAULT_MAP.lat, DEFAULT_MAP.lon], DEFAULT_MAP.zoom);
+const rkBase = {
+  map: L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', {
+    maxNativeZoom: 18,
+    maxZoom: 20,
+    keepBuffer: 1,
+    updateWhenIdle: true,
+    attribution: RK_TILE_ATTR
+  }),
+  photo: L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', {
+    maxNativeZoom: 18,
+    maxZoom: 20,
+    keepBuffer: 1,
+    updateWhenIdle: true,
+    attribution: RK_TILE_ATTR + '（全国最新写真）'
+  })
+};
+let rkBaseNow = 'map';
+try { if (localStorage.getItem('rk_base') === 'photo') rkBaseNow = 'photo'; } catch (_) {}
+rkBase[rkBaseNow].addTo(rkMap);
+const RkBaseCtl = L.Control.extend({
+  options: { position: 'topleft' },
+  onAdd: function () {
+    const d = L.DomUtil.create('div', 'rk-base leaflet-bar');
+    d.innerHTML = '<button type="button" data-base="map">地図</button><button type="button" data-base="photo">写真</button>';
+    L.DomEvent.disableClickPropagation(d);
+    d.addEventListener('click', e => {
+      const b = e.target.closest('[data-base]');
+      if (b) rkSetBase(b.dataset.base);
+    });
+    return d;
+  }
+});
+rkMap.addControl(new RkBaseCtl());
+function rkSetBase(k) {
+  if (k !== 'map' && k !== 'photo') return;
+  if (k !== rkBaseNow) {
+    rkMap.removeLayer(rkBase[rkBaseNow]);
+    rkBase[k].addTo(rkMap);
+    rkBase[k].bringToBack();
+    rkBaseNow = k;
+    try { localStorage.setItem('rk_base', k); } catch (_) {}
+  }
+  const el = document.getElementById('rkmap');
+  if (el) el.classList.toggle('rk-photo', k === 'photo');
+  document.querySelectorAll('.rk-base [data-base]').forEach(b => b.classList.toggle('on', b.dataset.base === k));
+}
+rkSetBase(rkBaseNow);
 L.control.scale({ imperial: false }).addTo(rkMap);
 setTimeout(() => rkMap.invalidateSize(), 0);
 
 const rkGrid = L.layerGroup().addTo(rkMap);
 let rkMarker = null;
-const rk = { grid: [], meta: null, current: null, busy: false, year: null, yearBusy: false, baseStatus: '' };
+const rk = { grid: [], meta: null, current: null, busy: false, year: null, yearBusy: false, baseStatus: '', candidates: [], tokyoWards: null, point: null };
+
+function rkIsTokyoContext() {
+  if (rk.tokyoWards && rk.tokyoWards.length) return true;
+  if (!rk.meta) return false;
+  const city = rk.meta.muniCity || rk.meta.city;
+  return !!(RosenkaCore.isTokyoSpecialWard && RosenkaCore.isTokyoSpecialWard(rk.meta.pref, city));
+}
+
+function rkPointInBbox(lat, lon, bbox, pad) {
+  pad = pad || 0;
+  return bbox[0] - pad <= lat && lat <= bbox[2] + pad &&
+    bbox[1] - pad <= lon && lon <= bbox[3] + pad;
+}
+
+/** 保存中の調査地点を含む、指定区の図郭を返す */
+function rkSheetAtPointForWard(wardName) {
+  if (!rk.point || !wardName) return null;
+  const { lat, lng } = rk.point;
+  const pad = 0.00015;
+  const wr = (rk.tokyoWards || []).find(w => w.city === wardName || w.muniCity === wardName);
+  const pool = (wr && wr.grid && wr.grid.length)
+    ? wr.grid.map(g => Object.assign({}, g, { ward: wr.city, city: wr.city, cityPage: wr.cityPage, id: g.id || (wr.city + ':' + g.sheet) }))
+    : rk.grid.filter(g => (g.ward || g.city) === wardName);
+  const hits = pool.filter(g => rkPointInBbox(lat, lng, g.bbox, pad));
+  if (!hits.length) return null;
+  hits.sort((a, b) => {
+    const da = Math.hypot((a.bbox[0] + a.bbox[2]) / 2 - lat, (a.bbox[1] + a.bbox[3]) / 2 - lng);
+    const db = Math.hypot((b.bbox[0] + b.bbox[2]) / 2 - lat, (b.bbox[1] + b.bbox[3]) / 2 - lng);
+    return da - db;
+  });
+  return hits[0];
+}
 
 /* Googleマップ（約1/500）
    埋め込みは maps.google.com の t= で切替: h=航空+ラベル / k=航空のみ */
@@ -134,14 +223,26 @@ function gmapRefresh(force) {
 /* ===== 道路種別 / 用途地域 / 土砂災害マップ（関連マップタブ）
    config/maps.json の登録簿から、地点の市区町村 → 都道府県 → 全国 の順に地図を選ぶ。
    市区町村を優先するのは maps.json の muniFirstPrefs に挙げた都道府県のみ。 */
-const GIS_TYPES = { road: '道路種別', zoning: '用途地域', sediment: '土砂災害マップ' };
+const GIS_TYPES = {
+  road: '道路種別',
+  zoning: '用途地域',
+  sediment: '土砂災害マップ',
+  gsi: '地理院地図',
+  kotei: '固定資産税路線価',
+  nouchi: '農地ナビ',
+  zenrin: 'ゼンリン住宅地図'
+};
 const GIS_SEARCH = {
   road: '建築基準法 道路種別 指定道路図',
   zoning: '用途地域 都市計画情報 地図',
-  sediment: '土砂災害警戒区域 ハザードマップ'
+  sediment: '土砂災害警戒区域 ハザードマップ',
+  gsi: '地理院地図',
+  kotei: '全国地価マップ 固定資産税路線価',
+  nouchi: 'eMAFF農地ナビ',
+  zenrin: 'ZENRIN GISパッケージ 住宅地図'
 };
 const GIS_LEVEL_LABEL = { muni: '市区町村', pref: '都道府県', national: '全国' };
-const GIS_TYPE_ORDER = ['road', 'zoning', 'sediment'];
+const GIS_TYPE_ORDER = ['road', 'zoning', 'sediment', 'gsi', 'kotei', 'nouchi', 'zenrin'];
 
 const gis = {
   reg: null,
@@ -149,27 +250,64 @@ const gis = {
   lon: DEFAULT_MAP.lon,
   pref: '',
   city: '',
+  address: '',
   zoom: 16,
-  mps: 2500
+  mps: 2500,
+  copyAddrOnOpen: false
 };
 
+function gisEnsureWorldGeodetic(url) {
+  // わが街ガイド系（wagmap / chikamap / 横浜 i-マッピー）の gprj:
+  //   1 = 日本測地系, 2 = 世界測地系（DynamicAPI のコメント通り）
+  // 未指定や誤値（かつての gprj=3）だと日本測地系扱いになり、
+  // 左地図と同じ WGS84 緯度経度を渡すと北西へ約450m（図郭約0.5枚）ずれる。
+  let u = String(url || '');
+  if (!u) return u;
+  if (!/(?:wagmap\.jp|chikamap\.jp|city\.yokohama\.lg\.jp\/[^?]*\/Map)/i.test(u)) return u;
+  if (!/[?&]mp[xy]=/i.test(u)) return u;
+  if (/[?&]gprj=/i.test(u)) {
+    return u.replace(/([?&])gprj=\d+/ig, '$1gprj=2');
+  }
+  return u + (u.indexOf('?') >= 0 ? '&' : '?') + 'gprj=2';
+}
+
 function gisFill(url) {
-  return String(url)
-    .replace(/\{lat\}/g, gis.lat)
-    .replace(/\{lon\}/g, gis.lon)
+  const lat = Number(gis.lat);
+  const lon = Number(gis.lon);
+  const latS = Number.isFinite(lat) ? String(lat) : '';
+  const lonS = Number.isFinite(lon) ? String(lon) : '';
+  // 左地図・Google と同じ世界測地系のまま渡し、gprj=2 で解釈させる
+  let u = gisEnsureWorldGeodetic(url);
+  return u
+    .replace(/\{lat\}/g, latS)
+    .replace(/\{lon\}/g, lonS)
+    .replace(/\{lng\}/g, lonS)
     .replace(/\{z\}/g, gis.zoom)
     .replace(/\{mps\}/g, gis.mps);
 }
 
 function gisHasLocation(url) {
-  return /\{lat\}|\{lon\}|\{z\}|\{mps\}/.test(String(url || ''));
+  return /\{lat\}|\{lon\}|\{lng\}|\{z\}|\{mps\}/.test(String(url || ''));
 }
 
 function gisPick(map) {
-  if (!map) return null;
+  if (!map || !gis.city) return null;
   if (map[gis.city]) return map[gis.city];
+  // maps.json は「横浜市」単位、GSIは「横浜市緑区」など区付きで来るため
+  // 前方一致（市区）と末尾一致（区名）の両方を許し、最長キーを優先する。
+  // includes は使わない（港南区⊃南区 のような誤爆を避ける）。
+  const city = String(gis.city);
+  const parentCity = (city.match(/^(.+?[市町村])/) || [])[1] || '';
+  if (parentCity && map[parentCity]) return map[parentCity];
   const keys = Object.keys(map)
-    .filter(k => gis.city && gis.city.includes(k))
+    .filter(k => {
+      if (!k) return false;
+      if (city === k) return true;
+      if (city.startsWith(k)) return true; // 横浜市緑区 → 横浜市
+      if (city.endsWith(k)) return true;   // …区 キー向け
+      if (k.endsWith(city)) return true;
+      return false;
+    })
     .sort((a, b) => b.length - a.length);
   return keys.length ? map[keys[0]] : null;
 }
@@ -180,14 +318,25 @@ function gisEntries(type) {
   if (!r) return [];
   const out = [];
   const muniFirst = (r.muniFirstPrefs || []).includes(gis.pref);
-  if (muniFirst) {
-    const e = gisPick(r.muni && r.muni[gis.pref]);
-    if (e && e[type]) out.push(Object.assign({ level: 'muni', area: gis.city }, e[type]));
-  }
+  const e = gisPick(r.muni && r.muni[gis.pref]);
+  const muniEntry = e && e[type]
+    ? Object.assign({ level: 'muni', area: gis.city }, e[type])
+    : null;
   const p = r.pref && r.pref[gis.pref];
-  if (p && p[type]) out.push(Object.assign({ level: 'pref', area: gis.pref }, p[type]));
+  const prefEntry = p && p[type]
+    ? Object.assign({ level: 'pref', area: gis.pref }, p[type])
+    : null;
   const n = r.national && r.national[type];
-  if (n) out.push(Object.assign({ level: 'national', area: '全国' }, n));
+  const natEntry = n ? Object.assign({ level: 'national', area: '全国' }, n) : null;
+  // muniFirstPrefs では市区町村を先頭に。それ以外でも市区町村登録があれば出す。
+  if (muniFirst) {
+    if (muniEntry) out.push(muniEntry);
+    if (prefEntry) out.push(prefEntry);
+  } else {
+    if (prefEntry) out.push(prefEntry);
+    if (muniEntry) out.push(muniEntry);
+  }
+  if (natEntry) out.push(natEntry);
   return out;
 }
 
@@ -224,7 +373,6 @@ function gisRenderHub() {
       );
     }
     const buttons = list.map(e => {
-      const url = gisFill(e.url);
       const loc = gisHasLocation(e.url);
       const level = GIS_LEVEL_LABEL[e.level] || e.level;
       const area = e.level === 'muni' && e.area ? '（' + e.area + '）' : '';
@@ -232,12 +380,15 @@ function gisRenderHub() {
         ? '<span class="maps-badge on">位置送信可</span>'
         : '<span class="maps-badge">位置固定なし</span>';
       const kind = e.pdf ? 'PDF' : '地図';
+      // href はクリック時に現在地点で組み立てる（描画時点の古い座標を送らない）
       return (
-        '<a class="maps-btn" href="' + url + '" target="_blank" rel="noopener" title="' +
+        '<a class="maps-btn" href="' + escHtml(gisFill(e.url)) + '" target="_blank" rel="noopener" data-maps-tpl="' +
+        escHtml(e.url) + '" title="' +
         escHtml(e.name) + '">' +
         '<span class="maps-btn-main">' + escHtml(level + area) + 'を開く ↗</span>' +
         '<span class="maps-btn-sub">' + escHtml(e.name) +
-        (e.pdf ? '（PDF）' : '') + '</span>' +
+        (e.pdf ? '（PDF）' : '') +
+        (e.note ? ' — ' + escHtml(e.note) : '') + '</span>' +
         badge +
         '<span class="maps-btn-kind">' + kind + '</span>' +
         '</a>'
@@ -253,22 +404,52 @@ function gisRenderHub() {
 }
 
 /* 地点の都道府県・市区町村を解決（路線価の結果があればそれを流用） */
-async function gisSetFocus(lat, lon, pref, city) {
+function gisSyncFromLeftMap() {
+  // 左地図のマーカー／中心を優先（Googleは別系統のまま触らない）
+  try {
+    if (rkMarker && rkMarker.getLatLng) {
+      const ll = rkMarker.getLatLng();
+      if (Number.isFinite(ll.lat) && Number.isFinite(ll.lng)) {
+        gis.lat = Number(ll.lat.toFixed(6));
+        gis.lon = Number(ll.lng.toFixed(6));
+        return;
+      }
+    }
+    if (rkMap && rkMap.getCenter) {
+      const c = rkMap.getCenter();
+      if (Number.isFinite(c.lat) && Number.isFinite(c.lng)) {
+        gis.lat = Number(c.lat.toFixed(6));
+        gis.lon = Number(c.lng.toFixed(6));
+      }
+    }
+  } catch (_) { /* ignore */ }
+}
+
+async function gisSetFocus(lat, lon, pref, city, opts) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
   gis.lat = Number(lat.toFixed(6));
   gis.lon = Number(lon.toFixed(6));
   if (pref) gis.pref = pref;
   if (city) gis.city = city;
-  gisRenderHub();
-  if (pref && city) return;
+  // 関連マップタブが開いているときだけ登録簿を用意して描画（起動・通常クリックでは重い maps.json を触らない）
+  const mapsOpen = document.querySelector('.rk-tabpane.on[data-tabpane="maps"]');
+  if (mapsOpen) {
+    await gisEnsureReg();
+    gisRenderHub();
+  }
+  if (opts && opts.skipRev) return;
   try {
     const r = await RosenkaCore.revGeocode(gis.lat, gis.lon);
     if (!r || !r.muniCd) return;
+    // クリック後に別地点へ移っていたら、古い逆ジオコーディング結果を捨てる
+    if (gis.lat !== Number(lat.toFixed(6)) || gis.lon !== Number(lon.toFixed(6))) return;
     const m = (await RosenkaCore.getMuni(rkCache))[String(parseInt(r.muniCd, 10))];
     if (!m) return;
+    const detail = String(r.lv01Nm || '').replace(/^[−ー\-\s]+$/, '').trim();
     gis.pref = m.pref;
     gis.city = m.city;
-    gisRenderHub();
+    rkSetAddress(m.pref + m.city + detail);
+    if (mapsOpen) gisRenderHub();
   } catch (_) { /* 解決できなければ全国版のまま */ }
 }
 
@@ -288,7 +469,8 @@ function settingsReadForm() {
     },
     gis: {
       zoom: Number(f.gisZoom.value),
-      mps: Number(f.gisMps.value)
+      mps: Number(f.gisMps.value),
+      copyAddrOnOpen: !!(f.gisCopyAddr && f.gisCopyAddr.checked)
     }
   };
 }
@@ -307,6 +489,7 @@ function settingsFillForm(s) {
   f.gmapLabels.checked = g.labels !== false;
   if (Number.isFinite(Number(gi.zoom))) f.gisZoom.value = Number(gi.zoom);
   if (Number.isFinite(Number(gi.mps))) f.gisMps.value = Number(gi.mps);
+  if (f.gisCopyAddr) f.gisCopyAddr.checked = !!gi.copyAddrOnOpen;
 }
 
 function settingsApply(s) {
@@ -321,6 +504,7 @@ function settingsApply(s) {
   if (typeof g.labels === 'boolean') gmap.labels = g.labels;
   if (Number.isFinite(Number(gi.zoom))) gis.zoom = Number(gi.zoom);
   if (Number.isFinite(Number(gi.mps))) gis.mps = Number(gi.mps);
+  gis.copyAddrOnOpen = !!gi.copyAddrOnOpen;
   if (Number.isFinite(lat) && Number.isFinite(lon)) {
     const z = Number.isFinite(zoom) ? zoom : DEFAULT_MAP.zoom;
     rkMap.setView([lat, lon], z);
@@ -328,7 +512,9 @@ function settingsApply(s) {
     rkMarker = L.marker([lat, lon]).addTo(rkMap);
     if (m.label) rkMarker.bindPopup(String(m.label)).openPopup();
     gmapSetFocus(lat, lon, m.label || DEFAULT_MAP.label);
-    gisSetFocus(lat, lon);
+    // 設定の初期位置でも座標は合わせるが、起動時の逆ジオコーディングは省略
+    gisSetFocus(lat, lon, null, null, { skipRev: true });
+    setTimeout(() => { try { rkMap.invalidateSize(); } catch (_) {} }, 0);
   } else {
     gmapUpdateLabels();
     gisRenderHub();
@@ -342,13 +528,26 @@ function settingsStatus(msg, ok) {
   el.dataset.ok = ok ? '1' : '0';
 }
 
-(async () => {
-  try {
-    const r = await fetch('/config/maps.json', { cache: 'no-store' });
-    gis.reg = await r.json();
-    gisRenderHub();
-  } catch (_) { /* 登録簿が無ければ各カードは未登録表示 */ }
-})();
+let gisRegPromise = null;
+function gisEnsureReg(force) {
+  if (gis.reg && !force) return Promise.resolve(gis.reg);
+  // force 時も描画中に reg を null にしない（初回クリックでマッピーが消える競合を防ぐ）
+  if (force) gisRegPromise = null;
+  if (!gisRegPromise) {
+    // ブラウザキャッシュを活かす（maps.json は大きいので毎回 no-store しない）
+    gisRegPromise = fetch('/config/maps.json')
+      .then(r => r.json())
+      .then(j => {
+        gis.reg = j;
+        return j;
+      })
+      .catch(() => {
+        gisRegPromise = null;
+        return gis.reg || null;
+      });
+  }
+  return gisRegPromise;
+}
 
 (async () => {
   try {
@@ -359,16 +558,59 @@ function settingsStatus(msg, ok) {
     settingsFillForm({
       map: DEFAULT_MAP,
       gmap: { scale: gmap.targetScale, labels: gmap.labels },
-      gis: { zoom: gis.zoom, mps: gis.mps }
+      gis: { zoom: gis.zoom, mps: gis.mps, copyAddrOnOpen: false }
     });
     gmapSetFocus(DEFAULT_MAP.lat, DEFAULT_MAP.lon, DEFAULT_MAP.label);
-    gisSetFocus(DEFAULT_MAP.lat, DEFAULT_MAP.lon);
+    // 起動時は逆ジオコーディングしない（初回クリック／関連マップ表示時に解決）
+    gisSetFocus(DEFAULT_MAP.lat, DEFAULT_MAP.lon, null, null, { skipRev: true });
   }
 })();
 
-const $id = x => document.getElementById(x);
-function rkStatus(_html) {
-  /* 左地図上部のステータスバーは廃止 */
+function rkSetAddress(addr) {
+  gis.address = addr ? String(addr).trim() : '';
+  const el = $id('rkStatusAddr');
+  if (el) el.textContent = gis.address || '地点を選択すると住所を表示します';
+}
+
+function rkStatus(html) {
+  const el = $id('rkStatusMsg');
+  if (!el) return;
+  el.innerHTML = html || '住所・地番を入力するか、地図をクリックしてください。';
+}
+
+async function gisCopyAddress() {
+  let text = gis.address;
+  if (!text && Number.isFinite(gis.lat) && Number.isFinite(gis.lon)) {
+    try {
+      const r = await RosenkaCore.revGeocode(gis.lat, gis.lon);
+      if (r && r.muniCd) {
+        const m = (await RosenkaCore.getMuni(rkCache))[String(parseInt(r.muniCd, 10))];
+        if (m) {
+          const detail = String(r.lv01Nm || '').replace(/^[−ー\-\s]+$/, '').trim();
+          text = m.pref + m.city + detail;
+          rkSetAddress(text);
+        }
+      }
+    } catch (_) { /* ignore */ }
+  }
+  if (!text) text = (gis.pref + gis.city) || '';
+  if (!text) return '';
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (_) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (_) { /* ignore */ }
+  }
+  return text;
 }
 
 function escHtml(s) {
@@ -433,9 +675,9 @@ async function pvRender() {
     return;
   }
   // 画面表示は軽め（PDF出力時は別途高解像度で描画）
-  const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
-  const want = Math.min(pv.scale * dpr, Math.sqrt(3.5e6 / (pv.w * pv.h)));
-  if (pv.rscale && Math.abs(want / pv.rscale - 1) < 0.2) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 1);
+  const want = Math.min(pv.scale * dpr, Math.sqrt(2.0e6 / (pv.w * pv.h)));
+  if (pv.rscale && Math.abs(want / pv.rscale - 1) < 0.25) return;
   pv.rendering = true;
   const gen = pv.gen;
   try {
@@ -467,7 +709,7 @@ async function pvRender() {
 let pvRenderTimer = null;
 function pvRenderSoon() {
   clearTimeout(pvRenderTimer);
-  pvRenderTimer = setTimeout(pvRender, 250);
+  pvRenderTimer = setTimeout(pvRender, 320);
 }
 
 function pvZoomAt(px, py, factor) {
@@ -646,6 +888,35 @@ function rkSetPdfPane(item) {
   rkUpdatePdfButton();
   $id('rkNta').href = item.page;
   $id('rkNta').style.display = '';
+  rkShowKouzuBtn();
+}
+
+function rkPinPoint() {
+  if (rk.point && Number.isFinite(rk.point.lat) && Number.isFinite(rk.point.lng)) {
+    return { lat: rk.point.lat, lng: rk.point.lng };
+  }
+  if (rkMarker) {
+    const ll = rkMarker.getLatLng();
+    return { lat: ll.lat, lng: ll.lng };
+  }
+  const c = rkMap.getCenter();
+  return { lat: c.lat, lng: c.lng };
+}
+
+function rkShowKouzuBtn() {
+  const btn = $id('vwChiban');
+  if (btn) btn.style.display = '';
+}
+
+async function rkOpenKouzu() {
+  const p = rkPinPoint();
+  if (!p) return;
+  if (window.rkKouzu) {
+    try {
+      if (await rkKouzu.openNear(p.lat, p.lng, 'menu')) return;
+    } catch (_) {}
+  }
+  window.open('https://kouzuviewer.com/chiban/', '_blank', 'noopener');
 }
 
 function rkShowPdf(item) {
@@ -655,6 +926,7 @@ function rkShowPdf(item) {
   $id('rkDirpad').style.display = '';
   rkDrawGrid();
   rkUpdatePdfButton();
+  rkSyncWardPick(item);
 }
 
 const rkWareki = y =>
@@ -695,7 +967,7 @@ async function rkYearIndexCheck(y, sheet) {
   const curBase = m[1], frPage = m[2], code = m[3];
   const namesOf = (towns, s) => Object.keys(towns || {}).filter(n => (towns[n] || []).includes(s));
   let curTowns = null;
-  const calib = await rkCache.get('calib_v2_' + rk.meta.year + '_' + code);
+  const calib = await rkCache.get('calib_v3_' + rk.meta.year + '_' + code);
   if (calib && calib.towns) curTowns = calib.towns;
   if (!curTowns) curTowns = await rkGetTowns(rk.meta.year, curBase, frPage, code);
   const oldTowns = await rkGetTowns(y, curBase.replace('/' + rk.meta.year + '/', '/' + y + '/'), frPage, code);
@@ -820,25 +1092,118 @@ function rkOnEarly(e) {
   rkProgress('地図の枠を準備中…');
 }
 
+function rkSheetId(g) {
+  if (!g) return '';
+  return g.id || ((g.ward || g.city || '') + ':' + g.sheet);
+}
+
 function rkDrawGrid() {
   rkGrid.clearLayers();
+  const curId = rkSheetId(rk.current);
+  const candIds = new Set((rk.candidates || []).map(rkSheetId));
   for (const g of rk.grid) {
     const b = [[g.bbox[0], g.bbox[1]], [g.bbox[2], g.bbox[3]]];
-    const isCur = rk.current && g.sheet === rk.current.sheet;
+    const id = rkSheetId(g);
+    const isCur = curId && id === curId;
+    const isCand = candIds.has(id);
     const rect = L.rectangle(b, {
-      color: isCur ? '#095c5f' : '#6a7a84',
-      weight: isCur ? 3 : 1,
-      fillColor: isCur ? '#0d7377' : '#6a7a84',
-      fillOpacity: isCur ? 0.14 : 0.03
+      color: isCur ? '#095c5f' : isCand ? '#b45309' : '#6a7a84',
+      weight: isCur ? 3 : isCand ? 2 : 1,
+      fillColor: isCur ? '#0d7377' : isCand ? '#d97706' : '#6a7a84',
+      fillOpacity: isCur ? 0.14 : isCand ? 0.08 : 0.03
     }).addTo(rkGrid);
-    rect.bindTooltip(g.sheet, { direction: 'center' });
+    const label = (g.ward || g.city) ? (g.ward || g.city) + ' ' + g.sheet : g.sheet;
+    // ツールチップは候補・表示中だけ（大量図郭でのDOM負荷を抑える）
+    if (isCand || isCur) {
+      rect.bindTooltip(label, { direction: 'center', sticky: true });
+      rect.on('click', ev => {
+        if (rkIsTokyoContext()) {
+          // 特別区は地図クリック側で地点を毎回再調査する（図郭クリックでは切替えない）
+          return;
+        }
+        if (ev && ev.originalEvent) L.DomEvent.stopPropagation(ev);
+        const hit = rk.grid.find(x => rkSheetId(x) === id);
+        if (hit) {
+          rkShowPdf(hit);
+          rkSyncWardPick(hit);
+        }
+      });
+    }
   }
 }
+
+function rkFillWardPick(candidates, selected) {
+  const wrap = $id('rkWardPickWrap');
+  const sel = $id('rkWardPick');
+  if (!wrap || !sel) return;
+  if (!candidates || candidates.length < 2) {
+    wrap.style.display = 'none';
+    sel.innerHTML = '';
+    return;
+  }
+  sel.innerHTML = candidates.map(c => {
+    const id = rkSheetId(c);
+    const mark = c.primary ? '★' : '';
+    const label = mark + (c.muniCity || c.city || '') + ' ' + c.sheet;
+    return '<option value="' + escHtml(id) + '"' +
+      (selected && rkSheetId(selected) === id ? ' selected' : '') + '>' +
+      escHtml(label) + '</option>';
+  }).join('');
+  wrap.style.display = '';
+}
+
+function rkSyncWardPick(item) {
+  const sel = $id('rkWardPick');
+  if (!sel || sel.style.display === 'none' && (!$id('rkWardPickWrap') || $id('rkWardPickWrap').style.display === 'none')) return;
+  const id = rkSheetId(item);
+  if (sel.value !== id && [...sel.options].some(o => o.value === id)) sel.value = id;
+}
+
+function rkOnWardPickChange() {
+  const sel = $id('rkWardPick');
+  if (!sel || !sel.value) return;
+  const id = sel.value;
+  const wardFromId = id.includes(':') ? id.split(':')[0] : '';
+  // 特別区切替時は、常に同じ調査地点を含む図を選ぶ
+  let hit = wardFromId ? rkSheetAtPointForWard(wardFromId) : null;
+  if (!hit) hit = rk.grid.find(g => rkSheetId(g) === id);
+  if (!hit && rk.candidates) hit = rk.candidates.find(g => rkSheetId(g) === id);
+  if (!hit) return;
+  if (rk.tokyoWards && hit.ward) {
+    const wr = rk.tokyoWards.find(w => w.city === hit.ward || w.muniCity === hit.ward);
+    if (wr && wr.grid && wr.grid.length) {
+      const mergedExtra = (rk.candidates || []).filter(c => c.ward !== hit.ward);
+      const byId = {};
+      for (const g of wr.grid) {
+        byId[rkSheetId(g) || (wr.city + ':' + g.sheet)] = Object.assign({}, g, {
+          ward: wr.city, city: wr.city, cityPage: wr.cityPage
+        });
+      }
+      for (const g of mergedExtra) byId[rkSheetId(g)] = g;
+      rk.grid = Object.values(byId);
+    }
+    if (rk.meta) {
+      rk.meta.city = wr ? wr.city : hit.ward;
+      rk.meta.muniCity = wr ? wr.muniCity : (hit.muniCity || hit.ward);
+      if (wr && wr.cityPage) rk.meta.cityPage = wr.cityPage;
+      else if (hit.cityPage) rk.meta.cityPage = hit.cityPage;
+      if (wr && wr.townMatch) rk.meta.townMatch = wr.townMatch;
+      rk.meta.hit = hit.sheet;
+    }
+  }
+  rkShowPdf(hit);
+  rkSyncWardPick(hit);
+}
+
+const rkWardPickEl = $id('rkWardPick');
+if (rkWardPickEl) rkWardPickEl.addEventListener('change', rkOnWardPickChange);
 
 const rkCenter = g => [(g.bbox[0] + g.bbox[2]) / 2, (g.bbox[1] + g.bbox[3]) / 2];
 
 function rkMoveDir(dir) {
   if (!rk.current) return;
+  const curId = rkSheetId(rk.current);
+  const curWard = rk.current.ward || rk.current.city || '';
   const c = rkCenter(rk.current);
   const h = rk.current.bbox[2] - rk.current.bbox[0];
   const w = rk.current.bbox[3] - rk.current.bbox[1];
@@ -849,8 +1214,11 @@ function rkMoveDir(dir) {
     w: [c[0], c[1] - w]
   }[dir];
   let best = null, bestD = Infinity;
-  for (const g of rk.grid) {
-    if (g.sheet === rk.current.sheet) continue;
+  // 同一区内を優先（東京で複数区の図郭が重なっているとき）
+  const pool = rk.grid.filter(g => !curWard || (g.ward || g.city) === curWard);
+  const search = pool.length > 1 ? pool : rk.grid;
+  for (const g of search) {
+    if (rkSheetId(g) === curId) continue;
     const gc = rkCenter(g);
     const d = Math.hypot((gc[0] - target[0]) / h, (gc[1] - target[1]) / w);
     if (d < bestD) {
@@ -869,10 +1237,12 @@ document.querySelectorAll('#rkDirpad button').forEach(b => {
 
 /* ── 隣接PDFの切り貼り（ユーザーが方向を選択）
    ヘッダ（凡例・図番号）を除いた地図部分だけを結合し、元の1枚と同じ用紙サイズで出力する。 */
-function rkSheetAt(lat, lng, exclude) {
+function rkSheetAt(lat, lng, excludeId) {
+  const curWard = rk.current && (rk.current.ward || rk.current.city);
   let best = null, bestD = Infinity;
   for (const g of rk.grid) {
-    if (exclude && g.sheet === exclude) continue;
+    if (excludeId && rkSheetId(g) === excludeId) continue;
+    if (curWard && (g.ward || g.city) && (g.ward || g.city) !== curWard) continue;
     const [s, w, n, e] = g.bbox;
     if (lat >= s && lat <= n && lng >= w && lng <= e) return g;
     const cy = (s + n) / 2, cx = (w + e) / 2;
@@ -882,14 +1252,50 @@ function rkSheetAt(lat, lng, exclude) {
   return bestD < 0.75 ? best : null;
 }
 
+/** dLat/dLng: -1|0|1。斜めは「対角セルの中心」を探る（角のすぐ外側だと隙間や縦横図に吸い寄るため） */
 function rkNeighbor(sheet, dLat, dLng) {
   if (!sheet) return null;
   const [s, w, n, e] = sheet.bbox;
   const h = Math.max(1e-9, n - s);
   const ww = Math.max(1e-9, e - w);
-  const lat = dLat > 0 ? n + h * 0.05 : dLat < 0 ? s - h * 0.05 : (s + n) / 2;
-  const lng = dLng > 0 ? e + ww * 0.05 : dLng < 0 ? w - ww * 0.05 : (w + e) / 2;
-  return rkSheetAt(lat, lng, sheet.sheet);
+  const diag = !!(dLat && dLng);
+  const step = diag ? 0.55 : 0.05;
+  const lat = dLat > 0 ? n + h * step : dLat < 0 ? s - h * step : (s + n) / 2;
+  const lng = dLng > 0 ? e + ww * step : dLng < 0 ? w - ww * step : (w + e) / 2;
+  return rkSheetAt(lat, lng, rkSheetId(sheet));
+}
+
+/**
+ * 斜め4枚結合用: 現在図 + 縦隣 + 横隣 + 斜め隣（いずれも別図）。
+ * 斜めは直接探索に加え、縦→横 / 横→縦 の経路でも探す。
+ */
+function rkQuadParts(cur, dLat, dLng) {
+  if (!cur || !dLat || !dLng) return null;
+  const horiz = rkNeighbor(cur, 0, dLng);
+  const vert = rkNeighbor(cur, dLat, 0);
+  if (!horiz || !vert) return null;
+  const ids = new Set([rkSheetId(cur), rkSheetId(horiz), rkSheetId(vert)]);
+  const isNew = g => g && !ids.has(rkSheetId(g));
+
+  const candidates = [
+    rkNeighbor(cur, dLat, dLng),
+    rkNeighbor(vert, 0, dLng),
+    rkNeighbor(horiz, dLat, 0)
+  ];
+  let diag = candidates.find(isNew) || null;
+  if (!diag) {
+    // 縦隣の対角寄り・横隣の対角寄りをもう一度（枠ずれ対策）
+    const [vs, vw, vn, ve] = vert.bbox;
+    const [hs, hw, hn, he] = horiz.bbox;
+    const vh = Math.max(1e-9, vn - vs);
+    const ww = Math.max(1e-9, he - hw);
+    const lat = dLat > 0 ? vn + vh * 0.55 : vs - vh * 0.55;
+    const lng = dLng > 0 ? he + ww * 0.55 : hw - ww * 0.55;
+    const hit = rkSheetAt(lat, lng, rkSheetId(cur));
+    if (isNew(hit)) diag = hit;
+  }
+  if (!diag) return null;
+  return { cur, horiz, vert, diag };
 }
 
 function rkActivePdfUrl(g) {
@@ -910,10 +1316,10 @@ function rkStitchPlan(dir) {
   const dLat = dir.includes('n') ? 1 : dir.includes('s') ? -1 : 0;
   const dLng = dir.includes('e') ? 1 : dir.includes('w') ? -1 : 0;
   if (dLat && dLng) {
-    const b = rkNeighbor(cur, 0, dLng);
-    const c = rkNeighbor(cur, dLat, 0);
-    const d = rkNeighbor(cur, dLat, dLng);
-    if (!b || !c || !d) return null;
+    // 縦・横に加え、斜めの図が揃って初めて4枚結合
+    const q = rkQuadParts(cur, dLat, dLng);
+    if (!q) return null;
+    const { horiz: b, vert: c, diag: d } = q;
     const south = dLat > 0 ? [cur, b] : [c, d];
     const north = dLat > 0 ? [c, d] : [cur, b];
     const ord = row => (dLng > 0 ? row : row.slice().reverse());
@@ -954,10 +1360,11 @@ function rkNeighborAvailability() {
   const w = !!rkNeighbor(cur, 0, -1);
   return {
     n, s, e, w,
-    ne: n && e && !!rkNeighbor(cur, 1, 1),
-    nw: n && w && !!rkNeighbor(cur, 1, -1),
-    se: s && e && !!rkNeighbor(cur, -1, 1),
-    sw: s && w && !!rkNeighbor(cur, -1, -1)
+    // 斜め4枚は縦・横・斜めが揃うときだけ（plan と同じ判定）
+    ne: !!rkStitchPlan('ne'),
+    nw: !!rkStitchPlan('nw'),
+    se: !!rkStitchPlan('se'),
+    sw: !!rkStitchPlan('sw')
   };
 }
 
@@ -1218,8 +1625,12 @@ function rkRender(j, opts) {
       msg +=
         ' <a href="' + j.ratioPage + '" target="_blank" rel="noopener">評価倍率表を開く ↗</a>';
     }
+    rk.candidates = [];
+    rk.tokyoWards = null;
+    rkFillWardPick([]);
     rkStatus(msg);
     if (j.geocode) {
+      if (j.geocode.title) rkSetAddress(j.geocode.title);
       if (rkMarker) rkMarker.remove();
       const pos = opts.latlng || [j.geocode.lat, j.geocode.lon];
       rkMarker = L.marker(pos).addTo(rkMap).bindPopup(escHtml(j.geocode.title || ''));
@@ -1234,25 +1645,45 @@ function rkRender(j, opts) {
 
   rk.meta = j;
   rk.grid = j.grid || [];
+  rk.candidates = j.candidates || [];
+  rk.tokyoWards = j.tokyoWards || null;
   rk.current = null;
+  if (j.geocode || opts.latlng) {
+    const la = (opts.latlng && opts.latlng.lat != null) ? opts.latlng.lat : j.geocode.lat;
+    const lo = (opts.latlng && opts.latlng.lng != null) ? opts.latlng.lng : j.geocode.lon;
+    if (Number.isFinite(la) && Number.isFinite(lo)) rk.point = { lat: la, lng: lo };
+  }
   if (rkMarker) rkMarker.remove();
   const pos = opts.latlng || [j.geocode.lat, j.geocode.lon];
   rkMarker = L.marker(pos).addTo(rkMap).bindPopup(escHtml(j.geocode.title || ''));
   const focusLat = (opts.latlng && opts.latlng.lat) || j.geocode.lat;
   const focusLon = (opts.latlng && opts.latlng.lng) || j.geocode.lon;
   gmapSetFocus(focusLat, focusLon, j.geocode && j.geocode.title);
-  gisSetFocus(focusLat, focusLon, j.pref, j.muniCity || j.city);
+  gisSetFocus(focusLat, focusLon, j.pref, j.city || j.muniCity);
+  rkShowKouzuBtn();
 
   let dispSheet = j.hit;
-  if (j.townMatch && j.indexAgree === false && rk.grid.length) {
+  let dispId = null;
+  const ptLat = (rk.point && rk.point.lat) || (opts.latlng && opts.latlng.lat) || (j.geocode && j.geocode.lat);
+  const ptLon = (rk.point && rk.point.lng) || (opts.latlng && opts.latlng.lng) || (j.geocode && j.geocode.lon);
+  if (j.candidates && j.candidates.length) {
+    // 地点を含む候補を優先（先頭がわずかに外れている場合の保険）
+    const containingCand = j.candidates.find(c => {
+      const g = rk.grid.find(x => rkSheetId(x) === rkSheetId(c)) ||
+        rk.grid.find(x => x.sheet === c.sheet && (x.ward || x.city) === (c.ward || c.city));
+      return g && Number.isFinite(ptLat) && rkPointInBbox(ptLat, ptLon, g.bbox, 0.00015);
+    });
+    const top = containingCand || j.candidates[0];
+    dispId = rkSheetId(top);
+    dispSheet = top.sheet;
+  }
+  // 東京の複数候補があるときは町丁補正で候補外の図に飛ばさない
+  if (!(j.candidates && j.candidates.length) &&
+      j.townMatch && j.indexAgree === false && rk.grid.length) {
     const cand = rk.grid.filter(g => j.townMatch.sheets.includes(g.sheet));
     if (cand.length) {
-      const inBox = cand.find(
-        g =>
-          g.bbox[0] <= pos[0] &&
-          pos[0] <= g.bbox[2] &&
-          g.bbox[1] <= pos[1] &&
-          pos[1] <= g.bbox[3]
+      const inBox = cand.find(g =>
+        Number.isFinite(ptLat) && rkPointInBbox(ptLat, ptLon, g.bbox, 0)
       );
       const pick =
         inBox ||
@@ -1260,18 +1691,22 @@ function rkRender(j, opts) {
           .map(g => ({
             g,
             d:
-              Math.pow((g.bbox[0] + g.bbox[2]) / 2 - pos[0], 2) +
-              Math.pow((g.bbox[1] + g.bbox[3]) / 2 - pos[1], 2)
+              Math.pow((g.bbox[0] + g.bbox[2]) / 2 - ptLat, 2) +
+              Math.pow((g.bbox[1] + g.bbox[3]) / 2 - ptLon, 2)
           }))
           .sort((a, b) => a.d - b.d)[0].g;
       if (pick && pick.sheet !== j.hit) {
         dispSheet = pick.sheet;
+        dispId = rkSheetId(pick);
         j.indexCorrected = true;
       }
     }
   }
 
-  const hit = rk.grid.find(g => g.sheet === dispSheet);
+  const hit = dispId
+    ? (rk.grid.find(g => rkSheetId(g) === dispId) || rk.grid.find(g => g.sheet === dispSheet))
+    : rk.grid.find(g => g.sheet === dispSheet);
+  rkFillWardPick(rk.candidates, hit);
   if (hit) {
     rkShowPdf(hit);
     if (opts.fit) {
@@ -1295,14 +1730,27 @@ function rkRender(j, opts) {
     (!j.townMatch || j.indexAgree || j.indexCorrected) &&
     !j.error;
   const wareki = j.year.replace('main_r', '令和').replace(/^令和0/, '令和');
+  const tapAddr =
+    (j.geocode && j.geocode.title) ||
+    (j.pref && (j.muniCity || j.city)
+      ? j.pref + (j.muniCity || j.city) + (j.lv01Nm || (j.townMatch && j.townMatch.name) || '')
+      : '') ||
+    gis.address;
+  if (tapAddr) rkSetAddress(tapAddr);
   if (j.pref) {
     const label = healthy
       ? '<span class="badge ok">表示中 ✓</span>'
       : '<span class="badge warn">表示中（位置は目安）</span>';
     parts.push(
-      `${label} ${escHtml(j.pref + (j.muniCity || j.city))}${
-        j.townMatch ? ' ' + escHtml(j.townMatch.name) : ''
-      }（${escHtml(wareki)}年分・最新）`
+      `${label} ${escHtml(tapAddr || j.pref + (j.muniCity || j.city))}（${escHtml(wareki)}年分・最新）`
+    );
+  }
+  if (rk.candidates && rk.candidates.length > 1) {
+    const names = [...new Set(rk.candidates.map(c => c.muniCity || c.city))];
+    parts.push(
+      '<span class="badge warn">複数候補</span> ' +
+      escHtml(names.join('・')) +
+      ' の図があります（「区・図」から選択）'
     );
   }
   if (j.error) parts.push('<span class="badge warn">注意</span> ' + escHtml(j.error));
@@ -1313,7 +1761,7 @@ function rkRender(j, opts) {
     Object.keys(localStorage)
       .filter(k => {
         if (/^rk_calib_main_/.test(k)) return true;
-        return /^rk_(calib_v2_|geo_|cities_|ratios_|zosei_)/.test(k) && !k.includes(j.year);
+        return /^rk_(calib_v2_|calib_v3_|geo_|geo_v3_|cities_|cities_v2_|ratios_|zosei_)/.test(k) && !k.includes(j.year);
       })
       .forEach(k => localStorage.removeItem(k));
   } catch (_) { /* ignore */ }
@@ -1337,6 +1785,81 @@ function rkRender(j, opts) {
     .catch(() => {});
 }
 
+async function rkGeocodeQuick(q) {
+  try {
+    const url = 'https://msearch.gsi.go.jp/address-search/AddressSearch?q=' + encodeURIComponent(q);
+    const j = await (await fetch(url)).json();
+    if (j && j[0] && j[0].geometry) {
+      return {
+        lon: j[0].geometry.coordinates[0],
+        lat: j[0].geometry.coordinates[1],
+        title: (j[0].properties && j[0].properties.title) || q
+      };
+    }
+  } catch (_) { /* ignore */ }
+  return null;
+}
+
+/* 「住所＋地番」を分解。例: 横浜市港北区新横浜二丁目100番 / 港北区新横浜2丁目100-1 */
+function rkParseChibanQuery(q) {
+  q = String(q || '').replace(/　/g, ' ').trim();
+  if (!q) return null;
+  const ascii = q.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+  /* 「2丁目」だけで終わる住所検索は地番扱いにしない */
+  if (/[0-9]+丁目\s*$/.test(ascii) && !/番/.test(q) && !/-\d/.test(ascii)) return null;
+
+  const m = ascii.match(
+    /^(.*?)[\s ]*([0-9]+(?:\s*[-−ー－の]\s*[0-9]+)*)\s*(?:番(?:地|号)?)?\s*(?:[0-9]+号)?\s*$/
+  );
+  if (!m || !m[1]) return null;
+  const addr = m[1].replace(/[\s ]+$/, '').replace(/地番$/, '').trim();
+  if (addr.length < 2) return null;
+  if (!/(都|道|府|県|市|区|町|村|丁目)/.test(addr)) return null;
+  /* 地番らしい手がかり（番・枝番）が無い単独数字は、丁目直後のみ許可 */
+  if (!/番/.test(q) && !/-/.test(m[2])) {
+    if (!/丁目$/.test(addr) && !/(町|村)$/.test(addr)) return null;
+  }
+  const chiban = (window.rkChibanLayer && rkChibanLayer.normChiban)
+    ? rkChibanLayer.normChiban(m[2])
+    : m[2].replace(/[−ー－の]/g, '-').replace(/\s/g, '');
+  if (!chiban || !/[0-9]/.test(chiban)) return null;
+  return { addr, chiban };
+}
+
+async function rkLookupChiban(parsed, onProgress) {
+  if (!window.rkChibanLayer || typeof rkChibanLayer.findNear !== 'function') {
+    return { error: '地番検索の準備ができていません。ページを再読み込みしてください。' };
+  }
+  if (onProgress) onProgress('住所を特定中…');
+  let g = await rkGeocodeQuick(parsed.addr);
+  if (!g && rk.point) {
+    g = { lat: rk.point.lat, lon: rk.point.lng, title: parsed.addr };
+  }
+  if (!g) {
+    return { error: '地番の手前の住所を特定できませんでした。「市区町村＋町名＋地番」で入力してください（例: 横浜市港北区新横浜二丁目100番）' };
+  }
+  if (onProgress) onProgress('地番「' + parsed.chiban + '」を検索中…');
+  const hits = await rkChibanLayer.findNear(g.lat, g.lon, parsed.chiban, 0.004);
+  if (!hits.length) {
+    return {
+      fallback: true,
+      geocode: g,
+      message: '地番「' + parsed.chiban + '」はこの付近の公開筆界データにありません（住居表示の位置で路線価図を表示します）'
+    };
+  }
+  const hit = hits[0];
+  rkChibanLayer.setEnabled(true);
+  rkChibanLayer.highlight(hit.item);
+  return {
+    lat: hit.lat,
+    lng: hit.lng,
+    chiban: hit.chiban,
+    title: (g.title || parsed.addr) + ' ' + hit.chiban,
+    geocode: g,
+    hit
+  };
+}
+
 async function rkGo() {
   const q = $id('rkAddr').value.trim();
   if (!q || rk.busy) return;
@@ -1344,6 +1867,48 @@ async function rkGo() {
   rk.earlyBadge = null;
   $id('rkGo').disabled = true;
   try {
+    if (window.rkChibanLayer && rkChibanLayer.clearHighlight) rkChibanLayer.clearHighlight();
+    const parsed = rkParseChibanQuery(q);
+    if (parsed) {
+      const found = await rkLookupChiban(parsed, rkProgress);
+      if (found.error) {
+        rkStatus('<span class="badge ng">エラー</span> ' + escHtml(found.error));
+        return;
+      }
+      if (found.fallback) {
+        const j = await RosenkaCore.lookupPoint(
+          found.geocode.lat, found.geocode.lon, rkCache, rkProgress,
+          found.geocode.title || parsed.addr, rkOnEarly
+        );
+        rk.earlyBadge = null;
+        rkRender(j, { fit: true });
+        rkStatus('<span class="badge warn">地番なし</span> ' + escHtml(found.message));
+        return;
+      }
+      const j = await RosenkaCore.lookupPoint(
+        found.lat, found.lng, rkCache, rkProgress, found.title, rkOnEarly
+      );
+      rk.earlyBadge = null;
+      rkRender(j, { fit: false });
+      try {
+        if (found.hit && found.hit.item) rkChibanLayer.highlight(found.hit.item);
+        const bb = found.hit && found.hit.item && found.hit.item.bb;
+        if (bb) {
+          rkMap.fitBounds([[bb[1], bb[0]], [bb[3], bb[2]]], {
+            padding: [40, 40], maxZoom: 19, animate: false
+          });
+        } else {
+          rkMap.setView([found.lat, found.lng], 18, { animate: false });
+        }
+      } catch (_) {}
+      const base = ((document.getElementById('rkStatusMsg') || {}).textContent || '').trim();
+      rkStatus(
+        '<span class="badge ok">地番</span> ' +
+        escHtml(found.title) +
+        (base ? ' ｜ ' + escHtml(base) : '')
+      );
+      return;
+    }
     const j = await RosenkaCore.lookupAddress(q, rkCache, rkProgress, rkOnEarly);
     rk.earlyBadge = null;
     rkRender(j, { fit: true });
@@ -1359,24 +1924,46 @@ $id('rkGo').onclick = rkGo;
 $id('rkAddr').addEventListener('keydown', e => {
   if (e.key === 'Enter') rkGo();
 });
+const vwChibanEl = $id('vwChiban');
+if (vwChibanEl) vwChibanEl.addEventListener('click', () => { rkOpenKouzu(); });
 
 rkMap.on('click', async e => {
   const latlng = e.latlng;
-  const g = rk.grid.find(
-    g =>
-      latlng.lat >= g.bbox[0] &&
-      latlng.lat <= g.bbox[2] &&
-      latlng.lng >= g.bbox[1] &&
-      latlng.lng <= g.bbox[3]
-  );
-  if (g) {
-    if (rkMarker) rkMarker.remove();
-    rkMarker = L.marker(latlng).addTo(rkMap);
-    gmapSetFocus(latlng.lat, latlng.lng);
-    gisSetFocus(latlng.lat, latlng.lng);
-    rkUpdatePdfButton();
-    if (!rk.current || rk.current.sheet !== g.sheet) rkShowPdf(g);
-    return;
+  if (window.rkChibanLayer && rkChibanLayer.clearHighlight) rkChibanLayer.clearHighlight();
+  // クリック直後にマーカーと関連マップ地点を更新（lookup 完了前にマッピーを開いても座標が合う）
+  if (rkMarker) rkMarker.remove();
+  rkMarker = L.marker(latlng).addTo(rkMap);
+  rk.point = { lat: latlng.lat, lng: latlng.lng };
+  gmapSetFocus(latlng.lat, latlng.lng);
+  rkSetAddress('住所を取得中…');
+  gisSetFocus(latlng.lat, latlng.lng);
+  rkShowKouzuBtn();
+
+  // 東京特別区は、図郭内でも毎回その地点で近隣区込みの路線価図を調べる
+  const tokyoMode = rkIsTokyoContext();
+  if (!tokyoMode) {
+    const matches = rk.grid.filter(
+      g =>
+        latlng.lat >= g.bbox[0] &&
+        latlng.lat <= g.bbox[2] &&
+        latlng.lng >= g.bbox[1] &&
+        latlng.lng <= g.bbox[3]
+    );
+    let g = null;
+    if (matches.length) {
+      const curWard = rk.current && (rk.current.ward || rk.current.city);
+      const curId = rkSheetId(rk.current);
+      g =
+        matches.find(x => rkSheetId(x) === curId) ||
+        (curWard && matches.find(x => (x.ward || x.city) === curWard)) ||
+        (rk.candidates || []).map(c => matches.find(x => rkSheetId(x) === rkSheetId(c))).find(Boolean) ||
+        matches[0];
+    }
+    if (g) {
+      rkUpdatePdfButton();
+      if (!rk.current || rkSheetId(rk.current) !== rkSheetId(g)) rkShowPdf(g);
+      return;
+    }
   }
   if (rk.busy) return;
   rk.busy = true;
@@ -1402,9 +1989,31 @@ document.querySelectorAll('.rk-tab').forEach(btn => {
     });
     if (id === 'rosenka') setTimeout(() => { try { rkMap.invalidateSize(); } catch (_) {} }, 0);
     if (id === 'gmap') gmapRefresh(true);
-    if (id === 'maps') gisRenderHub();
+    if (id === 'maps') {
+      gisSyncFromLeftMap();
+      // 毎回 force 再取得しない（キャッシュ済み maps.json を使う）
+      gisEnsureReg().then(() => {
+        const needRev = !(gis.pref && gis.city);
+        if (needRev) gisSetFocus(gis.lat, gis.lon);
+        else gisRenderHub();
+      });
+    }
   });
 });
+
+/* 関連マップ: クリック直前に左地図の座標で URL を組み立てる。
+   設定で有効なときだけ、位置固定なし地図の開封時に住所をコピーする。 */
+document.addEventListener('click', e => {
+  const a = e.target && e.target.closest && e.target.closest('a.maps-btn[data-maps-tpl]');
+  if (!a) return;
+  const tpl = a.getAttribute('data-maps-tpl');
+  if (!tpl) return;
+  gisSyncFromLeftMap();
+  a.href = gisFill(tpl);
+  if (!gisHasLocation(tpl) && gis.copyAddrOnOpen) {
+    gisCopyAddress();
+  }
+}, true);
 
 $id('settingsUseCurrent').addEventListener('click', () => {
   const f = $id('settingsForm');
