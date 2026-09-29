@@ -19,7 +19,7 @@
 }
 html{height:100%}
 body{
-  font-family:'IBM Plex Sans JP','IBM Plex Sans',sans-serif;
+  font-family:"Yu Gothic UI","Yu Gothic","Hiragino Sans","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
   background:
     radial-gradient(1200px 600px at 10% -10%, #d5e8ea 0%, transparent 55%),
     radial-gradient(900px 500px at 100% 0%, #dce6ef 0%, transparent 50%),
@@ -65,7 +65,7 @@ body{
   font-weight:700;
   color:#f2f7f8;
   letter-spacing:.04em;
-  font-family:'IBM Plex Sans', 'IBM Plex Sans JP', sans-serif;
+  font-family:"Yu Gothic UI","Yu Gothic","Hiragino Sans",Meiryo,sans-serif;
 }
 .topbar input{
   flex:1;
@@ -98,6 +98,22 @@ body{
 }
 .btn-search:hover{background:var(--accent-hover)}
 .btn-search:disabled{opacity:.55;cursor:not-allowed}
+.btn-reg{
+  height:30px;
+  min-width:72px;
+  padding:0 12px;
+  font-size:13px;
+  font-weight:700;
+  background:#fff;
+  color:#6a1b9a;
+  border:1.5px solid #6a1b9a;
+  border-radius:var(--radius-sm);
+  cursor:pointer;
+  font-family:inherit;
+  letter-spacing:.03em;
+  transition:background .15s,color .15s;
+}
+.btn-reg:hover{background:#6a1b9a;color:#fff}
 
 .rk-split{flex:1;min-height:0;display:flex}
 .rk-mapwrap{
@@ -108,8 +124,51 @@ body{
   display:flex;
   flex-direction:column;
   min-height:0;
+  position:relative;
 }
-#rkmap{flex:1;min-height:0;width:100%;background:#d7e0e6}
+#rkmap{flex:1;min-height:200px;width:100%;background:#d7e0e6;height:100%}
+
+.rk-status{
+  flex:0 0 auto;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  min-height:2.6em;
+  padding:8px 12px;
+  font-size:13px;
+  line-height:1.45;
+  color:var(--ink);
+  background:rgba(255,255,255,.94);
+  border-bottom:1px solid var(--line);
+  box-shadow:0 1px 0 rgba(15,28,36,.03);
+}
+.rk-status-addr{
+  font-weight:700;
+  font-size:13px;
+  color:var(--ink);
+  word-break:break-word;
+}
+.rk-status-msg{
+  min-width:0;
+  word-break:break-word;
+  color:var(--muted);
+  font-size:12.5px;
+}
+.badge{
+  display:inline-block;
+  margin-right:4px;
+  padding:1px 7px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.02em;
+  vertical-align:baseline;
+  white-space:nowrap;
+}
+.badge.ok{color:var(--ok);background:var(--ok-bg)}
+.badge.warn{color:var(--warn);background:var(--warn-bg)}
+.badge.ng{color:var(--ng);background:var(--ng-bg)}
+.muted{color:var(--muted);font-weight:400}
 
 .rk-right{
   flex:1;
@@ -399,7 +458,7 @@ body{
 }
 .maps-btn-ghost:hover{border-color:var(--accent);background:#f0fafb}
 
-/* その他（設定） */
+/* 設定タブ */
 .settings-pane{
   flex:1;
   min-height:0;
@@ -517,6 +576,33 @@ body{
   flex-wrap:wrap;
   background:linear-gradient(180deg,#fafcfd,#f3f7f9);
 }
+.rk-wardpick{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-right:4px;
+}
+.rk-wardpick-label{
+  font-size:12px;
+  font-weight:600;
+  color:var(--muted);
+  white-space:nowrap;
+}
+.rk-wardpick select{
+  height:36px;
+  max-width:min(220px,48vw);
+  padding:0 8px;
+  font-size:13px;
+  font-family:inherit;
+  color:var(--ink);
+  background:#fff;
+  border:1.5px solid var(--line);
+  border-radius:var(--radius-sm);
+}
+.rk-wardpick select:focus{
+  outline:none;
+  border-color:var(--accent);
+}
 .rk-yearbar{
   border-bottom:1px solid var(--line);
   background:#f0f4f6;
@@ -565,6 +651,103 @@ body{
   font-family:inherit;text-decoration:none;transition:border-color .15s,color .15s;
 }
 .btn-mini:hover{border-color:var(--accent);color:var(--accent)}
+button.btn-mini{appearance:none;-webkit-appearance:none}
+
+/* 地図⇄写真 */
+.rk-base{background:#fff;border-radius:4px;overflow:hidden;display:flex}
+.rk-base button{
+  border:none;background:#fff;font-family:inherit;font-size:12px;font-weight:700;
+  color:var(--muted);padding:5px 9px;cursor:pointer;line-height:1.4
+}
+.rk-base button+button{border-left:1px solid var(--line)}
+.rk-base button.on{background:var(--accent);color:#fff}
+#rkmap.rk-photo .leaflet-tile-pane{filter:brightness(.82) saturate(.85)}
+
+/* 筆界・地番トグル */
+.rk-lyr-chiban{
+  background:#fff;border-radius:4px;overflow:hidden;min-width:0;max-width:220px
+}
+.rk-lyr-chiban label{
+  display:flex;align-items:center;gap:6px;padding:6px 9px;cursor:pointer;
+  font-size:12px;font-weight:700;color:var(--muted);user-select:none;margin:0
+}
+.rk-lyr-chiban input{accent-color:var(--accent);margin:0}
+.rk-lyr-chiban label:hover{color:var(--accent)}
+.rk-lyr-note{
+  font-size:11px;line-height:1.4;color:var(--muted);padding:0 9px 6px;
+  border-top:1px solid var(--line);background:#fafbfc
+}
+.cb-lbl,.leaflet-div-icon.cb-lbl{
+  background:transparent!important;border:none!important;
+  font-size:11px;font-weight:700;color:#6d0f35;white-space:nowrap;
+  text-shadow:0 0 3px #fff,0 0 3px #fff,1px 0 0 #fff,-1px 0 0 #fff,0 1px 0 #fff,0 -1px 0 #fff;
+  pointer-events:none
+}
+.cb-lbl.cc-lbl{color:#bf360c}
+
+/* 過去案件（地価公示風の点） */
+.rk-lyr-past .lyr-sw{
+  display:inline-block;width:10px;height:10px;border-radius:50%;
+  border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25);flex:0 0 auto
+}
+#rkPastNote{
+  position:absolute;left:12px;bottom:12px;z-index:450;
+  max-width:min(320px,70%);padding:6px 10px;border-radius:4px;
+  background:rgba(255,255,255,.92);border:1px solid var(--line);
+  font-size:11.5px;color:var(--muted);line-height:1.4;
+  box-shadow:0 1px 4px rgba(0,0,0,.08);pointer-events:none
+}
+.lyr-lab.pc-lab,.leaflet-tooltip.pc-lab{
+  background:rgba(255,255,255,.92)!important;border:1px solid #6a1b9a!important;
+  color:#4a148c!important;font-size:11px!important;font-weight:700!important;
+  padding:2px 6px!important;border-radius:3px!important;box-shadow:none!important
+}
+.lyr-lab.pc-lab::before{display:none!important}
+.lyr-pop-pc{min-width:180px;font-size:12.5px;line-height:1.5}
+.lyr-pop-pc .pc-h{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+.lyr-pop-pc .pc-kind{font-size:11px;color:#6a1b9a;font-weight:700}
+.lyr-pop-pc .pc-name{font-size:14px;color:var(--ink)}
+.lyr-pop-pc .pc-line{color:var(--muted);margin:2px 0 8px}
+.lyr-pop-pc .pc-link{
+  display:inline-flex;align-items:center;padding:4px 10px;border-radius:4px;
+  background:#6a1b9a;color:#fff!important;text-decoration:none;font-weight:700;font-size:12px
+}
+.lyr-pop-pc .pc-link:hover{background:#4a148c}
+.rk-past-form{padding:18px 18px 14px;min-width:min(420px,92vw)}
+.rk-past-pos{
+  margin:0 0 12px;padding:8px 10px;border-radius:4px;background:#f4f7f8;
+  font-size:12px;color:var(--muted);line-height:1.5;word-break:break-all
+}
+.rk-past-field{
+  display:flex;flex-direction:column;gap:4px;margin:0 0 12px;
+  font-size:12.5px;font-weight:700;color:var(--ink)
+}
+.rk-past-field input{
+  height:34px;padding:0 10px;border:1.5px solid var(--line);border-radius:var(--radius-sm);
+  font:inherit;font-weight:500;color:var(--ink)
+}
+.rk-past-field textarea{
+  min-height:72px;padding:8px 10px;border:1.5px solid var(--line);border-radius:var(--radius-sm);
+  font:inherit;font-weight:500;color:var(--ink);resize:vertical;line-height:1.5
+}
+.rk-past-field input:focus,.rk-past-field textarea:focus{outline:none;border-color:#6a1b9a;box-shadow:0 0 0 3px rgba(106,27,154,.18)}
+.rk-past-actions{display:flex;align-items:center;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.rk-past-actions .settings-status{margin-right:auto;font-size:12px;color:#c62828}
+.lyr-pop-pc .pc-building{font-size:13px;font-weight:700;color:#4a148c;margin:0 0 4px}
+.lyr-pop-pc .pc-memo{
+  margin:6px 0 8px;padding:6px 8px;border-radius:4px;background:#f6f0fa;
+  color:var(--muted);font-size:12px;white-space:pre-wrap;word-break:break-word
+}
+.rk-past-ctx{
+  position:fixed;z-index:10000;display:none;min-width:160px;
+  background:#fff;border:1px solid var(--line);border-radius:6px;
+  box-shadow:0 6px 20px rgba(0,0,0,.16);padding:4px;overflow:hidden
+}
+.rk-past-ctx button{
+  display:block;width:100%;border:none;background:transparent;text-align:left;
+  padding:8px 12px;font:inherit;font-size:13px;font-weight:700;color:#4a148c;cursor:pointer
+}
+.rk-past-ctx button:hover{background:#f3e5f5}
 
 #rkpdf{flex:1;position:relative;overflow:hidden;background:#3d454b;touch-action:none;cursor:grab;min-height:0}
 #rkpdf.dragging{cursor:grabbing}
