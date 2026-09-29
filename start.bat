@@ -20,12 +20,20 @@ if errorlevel 1 (
 )
 
 echo サーバーを起動しています...
+echo ブラウザで http://localhost:5173 を開きます。
 echo （終了するには、このウィンドウで Ctrl + C を押してください）
 echo.
 
 set OPEN_BROWSER=1
 node server.js
 set "EC=%ERRORLEVEL%"
+if not "%EC%"=="0" (
+  echo.
+  echo [エラー] サーバーが終了コード %EC% で止まりました。
+  echo Node.js が入っているか、ポート 5173 が空いているか確認してください。
+  echo.
+  pause
+)
 endlocal & exit /b %EC%
 
 :: ---------- Node.js LTS が無ければ自動インストール ----------
