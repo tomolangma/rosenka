@@ -8,6 +8,7 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const { URL } = require('url');
 const { exec } = require('child_process');
 
@@ -109,25 +110,46 @@ function cacheFor(filePath) {
   const base = path.basename(filePath);
   const ext = path.extname(filePath).toLowerCase();
   if (base === 'settings.json' || ext === '.html') return 'no-cache';
+  if (base === 'maps.json') return 'public, max-age=600';
   if (ext === '.json') return 'public, max-age=300';
+  if (ext === '.js' || ext === '.css') return 'public, max-age=86400';
   if (ext === '.ico' || ext === '.png') return 'public, max-age=604800';
   return 'public, max-age=3600';
 }
 
-function serveFile(res, filePath) {
-  fs.stat(filePath, (err, st) => {
-    if (err || !st.isFile()) {
+function serveFile(res, filePath, req) {
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
       send(res, 404, 'not found', { 'Content-Type': 'text/plain; charset=utf-8' });
       return;
     }
     const ext = path.extname(filePath).toLowerCase();
     const type = MIME[ext] || 'application/octet-stream';
-    res.writeHead(200, {
+    const headers = {
       'Content-Type': type,
       'Cache-Control': cacheFor(filePath),
       'Access-Control-Allow-Origin': '*'
-    });
-    fs.createReadStream(filePath).pipe(res);
+    };
+    const ae = String((req && req.headers && req.headers['accept-encoding']) || '');
+    const compressible =
+      data.length > 1024 &&
+      (ext === '.js' || ext === '.css' || ext === '.json' || ext === '.html' || ext === '.svg');
+    if (compressible && /\bgzip\b/.test(ae)) {
+      zlib.gzip(data, (zerr, buf) => {
+        if (zerr || !buf) {
+          res.writeHead(200, headers);
+          res.end(data);
+          return;
+        }
+        headers['Content-Encoding'] = 'gzip';
+        headers['Vary'] = 'Accept-Encoding';
+        res.writeHead(200, headers);
+        res.end(buf);
+      });
+      return;
+    }
+    res.writeHead(200, headers);
+    res.end(data);
   });
 }
 
@@ -197,7 +219,11 @@ async function handlePutSettings(req, res) {
         label: String(map.label == null ? '' : map.label).slice(0, 80)
       },
       gmap: { scale: Math.round(scale), labels: !!gmap.labels },
-      gis: { zoom: Math.round(gisZoom), mps: Math.round(mps) }
+      gis: {
+        zoom: Math.round(gisZoom),
+        mps: Math.round(mps),
+        copyAddrOnOpen: !!gis.copyAddrOnOpen
+      }
     };
     fs.writeFileSync(SETTINGS_PATH, JSON.stringify(next, null, 2) + '\n', 'utf8');
     send(res, 200, JSON.stringify(next), {
@@ -254,7 +280,10 @@ const server = http.createServer(async (req, res) => {
     if (!err && st.isDirectory()) {
       return send(res, 404, 'not found', { 'Content-Type': 'text/plain' });
     }
-    serveFile(res, filePath);
+    if (err || !st.isFile()) {
+      return send(res, 404, 'not found', { 'Content-Type': 'text/plain; charset=utf-8' });
+    }
+    serveFile(res, filePath, req);
   });
 });
 

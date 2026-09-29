@@ -283,10 +283,182 @@
 
   const median = arr => arr.slice().sort((x, y) => x - y)[Math.floor(arr.length / 2)];
 
+  const PRE_GRID = 'https://dead-or-alive.pages.dev/rosenka-walker/layers/rosenka_grid/';
+  const swOf = img => median(Object.values(img.sheets || {}).map(r => r[2] - r[0]));
+  const shOf = img => median(Object.values(img.sheets || {}).map(r => r[3] - r[1]));
+
+  function parseConnect(html) {
+    const m = html.match(/<table[^>]*tbl_connectmap[^>]*>([\s\S]*?)<\/table>/);
+    if (!m) return null;
+    const rows = [...m[1].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)].map(tr =>
+      [...tr[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map(td => {
+        const d = td[1].match(/\d{5}/);
+        return d ? d[0] : null;
+      }));
+    if (rows.length !== 3 || rows.some(r => r.length !== 3)) return null;
+    return { n: rows[0][1], s: rows[2][1], w: rows[1][0], e: rows[1][2] };
+  }
+
+  function edgeSheets(img) {
+    const S = img.sheets, out = { n: [], s: [], e: [], w: [] };
+    for (const [sid, r] of Object.entries(S)) {
+      const w = r[2] - r[0], h = r[3] - r[1];
+      const has = (dx, dy) => {
+        const cx = (r[0] + r[2]) / 2 + dx * w, cy = (r[1] + r[3]) / 2 + dy * h;
+        return Object.values(S).some(q => q[0] <= cx && cx <= q[2] && q[1] <= cy && cy <= q[3]);
+      };
+      if (!has(1, 0)) out.e.push(sid);
+      if (!has(-1, 0)) out.w.push(sid);
+      if (!has(0, -1)) out.n.push(sid);
+      if (!has(0, 1)) out.s.push(sid);
+    }
+    return out;
+  }
+
+  async function stitchImages(cityBase, images, onProgress) {
+    const n = images.length, conn = {};
+    if (n < 2) return { offs: images.map(() => [0, 0]), comp: images.map(() => 0), conn };
+    const SW = images.map(swOf), SH = images.map(shOf);
+    const where = {};
+    images.forEach((img, i) => { for (const sid in img.sheets) where[sid] = i; });
+    const groups = [];
+    images.forEach((img, i) => {
+      const E = edgeSheets(img);
+      for (const d of ['n', 's', 'e', 'w']) {
+        const lst = E[d].map(sid => {
+          const r = img.sheets[sid];
+          const dist = d === 'e' ? img.w - r[2] : d === 'w' ? r[0] : d === 'n' ? r[1] : img.h - r[3];
+          return [dist, sid];
+        }).sort((a, b) => a[0] - b[0]);
+        if (lst.length) groups.push({ i, d, lst, dead: 0 });
+      }
+    });
+    groups.sort((a, b) => a.lst[0][0] - b.lst[0][0]);
+    const jobs = [];
+    for (let k = 0; groups.some(g => g.lst.length); k++) {
+      const g = groups[k % groups.length];
+      if (g.lst.length) jobs.push([g, g.lst.shift()[1]]);
+    }
+    const TOL = 0.25, BUDGET = 24, pairs = {};
+    const cluster = v => {
+      let best = [];
+      for (const o of v) {
+        const c = v.filter(p => Math.abs(p[0] - o[0]) <= TOL && Math.abs(p[1] - o[1]) <= TOL);
+        if (c.length > best.length) best = c;
+      }
+      return best;
+    };
+    const strongEdges = () => Object.entries(pairs).filter(([, v]) => cluster(v).length >= 2).map(([k]) => k.split(',').map(Number));
+    const connected = () => {
+      const adj = images.map(() => []);
+      for (const [i, j] of strongEdges()) { adj[i].push(j); adj[j].push(i); }
+      const seen = new Set([0]), st = [0];
+      while (st.length) {
+        const x = st.pop();
+        for (const y of adj[x]) if (!seen.has(y)) { seen.add(y); st.push(y); }
+      }
+      return seen.size === n;
+    };
+    let fetched = 0, p = 0;
+    while (p < jobs.length && fetched < BUDGET && !connected()) {
+      const batch = [];
+      while (batch.length < 4 && p < jobs.length && fetched + batch.length < BUDGET) {
+        const jb = jobs[p++];
+        if (jb[0].dead >= 2) continue;
+        batch.push(jb);
+      }
+      if (!batch.length) break;
+      fetched += batch.length;
+      await Promise.all(batch.map(async ([g, sid]) => {
+        let c = null;
+        try { c = parseConnect(await fetchSJIS(cityBase + 'html/' + sid + 'f.htm')); } catch (e) { /* empty */ }
+        if (c) conn[sid] = c;
+        const t = c && c[g.d];
+        const j = t ? where[t] : undefined;
+        if (j === undefined || j === g.i) { g.dead++; return; }
+        g.dead = 0;
+        const ra = images[g.i].sheets[sid], rb = images[j].sheets[t];
+        const ua = ra[0] / SW[g.i], va = ra[1] / SH[g.i], ub = rb[0] / SW[j], vb = rb[1] / SH[j];
+        const exp = { e: [ua + 1, va], w: [ua - 1, va], n: [ua, va - 1], s: [ua, va + 1] }[g.d];
+        const off = [exp[0] - ub, exp[1] - vb];
+        const key = g.i < j ? g.i + ',' + j : j + ',' + g.i;
+        (pairs[key] = pairs[key] || []).push(g.i < j ? off : [-off[0], -off[1]]);
+      }));
+      if (onProgress) onProgress('索引図をつなぎ合わせ中… ' + fetched);
+    }
+    const edges = Object.entries(pairs).map(([k, v]) => {
+      const c = cluster(v);
+      return { ij: k.split(',').map(Number), n: c.length, o: [median(c.map(x => x[0])), median(c.map(x => x[1]))] };
+    }).sort((a, b) => b.n - a.n);
+    const offs = images.map(() => null), comp = images.map(() => null);
+    let cid = 0;
+    for (let r = 0; r < n; r++) {
+      if (offs[r]) continue;
+      offs[r] = [0, 0]; comp[r] = cid;
+      const st = [r];
+      while (st.length) {
+        const x = st.pop();
+        for (const e of edges) {
+          const [i, j] = e.ij;
+          if (i === x && !offs[j]) { offs[j] = [offs[i][0] + e.o[0], offs[i][1] + e.o[1]]; comp[j] = cid; st.push(j); }
+          else if (j === x && !offs[i]) { offs[i] = [offs[j][0] - e.o[0], offs[j][1] - e.o[1]]; comp[i] = cid; st.push(i); }
+        }
+      }
+      cid++;
+    }
+    return { offs, comp, conn, fetched };
+  }
+
+  function fitShared(P) {
+    const byc = {};
+    for (const p of P) (byc[p[7]] = byc[p[7]] || []).push(p);
+    let na = 0, da = 0, nc = 0, dc = 0;
+    const means = {};
+    for (const [c, L] of Object.entries(byc)) {
+      const mu = L.reduce((sum, p) => sum + p[0], 0) / L.length;
+      const mv = L.reduce((sum, p) => sum + p[1], 0) / L.length;
+      const ml = L.reduce((sum, p) => sum + p[2], 0) / L.length;
+      const mt = L.reduce((sum, p) => sum + p[3], 0) / L.length;
+      means[c] = [mu, mv, ml, mt];
+      for (const p of L) {
+        na += (p[0] - mu) * (p[2] - ml); da += (p[0] - mu) * (p[0] - mu);
+        nc += (p[1] - mv) * (p[3] - mt); dc += (p[1] - mv) * (p[1] - mv);
+      }
+    }
+    if (da < 1e-9 || dc < 1e-9) return null;
+    const A = na / da, C = nc / dc;
+    if (Math.abs(A) < 1e-12 || Math.abs(C) < 1e-12) return null;
+    const T = {};
+    for (const [c, [mu, mv, ml, mt]] of Object.entries(means)) T[c] = [A, ml - A * mu, C, mt - C * mv];
+    return T;
+  }
+
+
   // 路線価図の紙面はほぼ横長（縦1 : 横1.4 ≒ A判）。大きく外れたときだけ直す
   const SHEET_ASPECT_WH = 1.4;
   const SHEET_ASPECT_MIN = 1.12;
   const SHEET_ASPECT_MAX = 1.75;
+  // 大磯・二宮は海岸沿い図郭の南北が短く出やすいので、縦を広めに取る
+  const COASTAL_GRID_CITIES = new Set(['大磯町', '二宮町']);
+  const SHEET_ASPECT_COASTAL_WH = 1.05;
+  const SHEET_ASPECT_COASTAL_MIN = 0.9;
+  const SHEET_ASPECT_COASTAL_MAX = 1.25;
+  const COASTAL_HEIGHT_BOOST = 1.28;
+
+  function isCoastalGridCity(name) {
+    return !!(name && COASTAL_GRID_CITIES.has(name));
+  }
+
+  function sheetAspectParams(geoCity) {
+    if (isCoastalGridCity(geoCity)) {
+      return {
+        target: SHEET_ASPECT_COASTAL_WH,
+        min: SHEET_ASPECT_COASTAL_MIN,
+        max: SHEET_ASPECT_COASTAL_MAX
+      };
+    }
+    return { target: SHEET_ASPECT_WH, min: SHEET_ASPECT_MIN, max: SHEET_ASPECT_MAX };
+  }
 
   function metersPerDeg(lat) {
     const phi = (Number(lat) || 35) * Math.PI / 180;
@@ -310,12 +482,13 @@
     return { wh: h > 1e-12 ? w / h : 0, sw, sh, m };
   }
 
-  /* 図郭の地上縦横比が 1:1.4 から大きく外れたら、広がりの大きい軸を残して組み直す */
-  function constrainTransformAspect(t, img, pts, lat0) {
+  /* 図郭の地上縦横比が目標から大きく外れたら、広がりの大きい軸を残して組み直す */
+  function constrainTransformAspect(t, img, pts, lat0, geoCity) {
     if (!t) return t;
+    const asp = sheetAspectParams(geoCity);
     const lat = lat0 != null ? lat0 : (pts && pts.length ? median(pts.map(p => p[3])) : 35);
     const info = transformSheetAspectWH(t, img, lat);
-    if (info.wh >= SHEET_ASPECT_MIN && info.wh <= SHEET_ASPECT_MAX) return t;
+    if (info.wh >= asp.min && info.wh <= asp.max) return t;
     const { sw, sh, m } = info;
     let pxSpan = 0, pySpan = 0;
     if (pts && pts.length) {
@@ -325,9 +498,9 @@
     }
     let a = t[0], c = t[2];
     if (pySpan >= pxSpan) {
-      a = Math.sign(a || 1) * SHEET_ASPECT_WH * Math.abs(c) * sh * m.lat / (sw * m.lon);
+      a = Math.sign(a || 1) * asp.target * Math.abs(c) * sh * m.lat / (sw * m.lon);
     } else {
-      c = Math.sign(c || -1) * Math.abs(a) * sw * m.lon / (SHEET_ASPECT_WH * sh * m.lat);
+      c = Math.sign(c || -1) * Math.abs(a) * sw * m.lon / (asp.target * sh * m.lat);
     }
     let b = t[1], d = t[3];
     if (pts && pts.length) {
@@ -335,6 +508,19 @@
       d = pts.reduce((s, p) => s + (p[3] - c * p[1]), 0) / pts.length;
     }
     return [a, b, c, d];
+  }
+
+  /* 海岸沿い図郭の南北方向だけ、図郭中心を保ったまま広げる */
+  function boostCoastalSheetHeight(t, img, geoCity) {
+    if (!t || !isCoastalGridCity(geoCity)) return t;
+    if (img && img._coastBoosted) return t;
+    const rects = Object.values(img.sheets || {});
+    if (!rects.length) return t;
+    const cy = median(rects.map(r => (r[1] + r[3]) / 2));
+    const c2 = t[2] * COASTAL_HEIGHT_BOOST;
+    const d2 = t[3] + t[2] * (1 - COASTAL_HEIGHT_BOOST) * cy;
+    if (img) img._coastBoosted = true;
+    return [t[0], t[1], c2, d2];
   }
 
   /* 同一GIF上の離れた切り抜き（大磯が上・二宮が下の別地図など）を塊に分ける */
@@ -402,61 +588,170 @@
     return out;
   }
 
-  /* 隣接市区で同じ図番号の路線価図を共有する組。町丁が少ない側は相手の枠に合わせ、表示は両方出す */
+  /* 隣接市区で同じ図番号の路線価図を共有する組。表示時は両方の枠を重ねる */
   const GRID_PARTNERS = {
     '葉山町': ['逗子市'],
     '逗子市': ['葉山町'],
     '大磯町': ['二宮町'],
     '二宮町': ['大磯町']
   };
-  const GRID_ANCHOR = {
-    '葉山町': '逗子市',
-    '二宮町': '大磯町'
+  /* 例外組: 索引を南北/東西に張り合わせたうえで事前校正を当てる */
+  const GRID_PAIR = {
+    '葉山町': { partner: '逗子市', axis: 'ns' },
+    '逗子市': { partner: '葉山町', axis: 'ns' },
+    '大磯町': { partner: '二宮町', axis: 'ew' },
+    '二宮町': { partner: '大磯町', axis: 'ew' }
   };
 
   function partnerNames(cityName) {
     return GRID_PARTNERS[cityName] || [];
   }
 
-  /* 隣接市の縮尺をそのまま使い、共有図番号の枠が重なるよう平行移動だけ合わせる */
-  function pinImagesToNeighborSheets(images, neighborCalib) {
+  async function fetchPreGrid(yr, code) {
+    try {
+      const r = await fetch(PRE_GRID + yr + '/' + code + '.json', { cache: 'no-cache' });
+      if (!r.ok) return null;
+      const ct = r.headers.get('content-type') || '';
+      if (ct.includes('json') || ct.includes('text/plain')) return await r.json();
+      const txt = await r.text();
+      return txt.trim().startsWith('{') ? JSON.parse(txt) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function clearImageTransforms(images) {
+    for (const img of images || []) {
+      if (img.extra) continue;
+      img.transform = null;
+      img.quality = { hit: 0, n: 0 };
+      delete img.anchored;
+    }
+  }
+
+  /* 事前校正JSONを索引画像へ適用。健全でなければ破棄して false */
+  function applyPreToImages(images, pre) {
+    if (!pre) return false;
+    const byGif = {};
+    for (const pi of (pre.images || [])) byGif[pi.gif] = pi;
+    if (!images.length || !images.every(img => byGif[img.gif] && byGif[img.gif].transform)) return false;
+    for (const img of images) {
+      const pi = byGif[img.gif];
+      img.transform = pi.t6 || pi.transform;
+      img.quality = pi.quality || { hit: 0, n: 0 };
+      img.anchored = !!pi.anchored;
+    }
+    if (!preTransformsOk(images)) {
+      clearImageTransforms(images);
+      return false;
+    }
+    return true;
+  }
+
+  function addPreExtra(images, pre) {
+    if (!pre || !pre.extra || !Object.keys(pre.extra).length) return;
+    for (let i = images.length - 1; i >= 0; i--) {
+      if (images[i].extra) images.splice(i, 1);
+    }
+    const sheets = {};
+    for (const [sid, b] of Object.entries(pre.extra)) sheets[sid] = [b[1], b[0], b[3], b[2]];
+    const est = {};
+    for (const sid of (pre.extra_est || [])) est[sid] = true;
+    images.push({
+      gif: '_extra', mp: '', w: 0, h: 0, sheets,
+      transform: [1, 0, 1, 0], quality: { hit: 1, n: 1 },
+      anchored: true, extra: true, est
+    });
+  }
+
+  /* 共有図番号の経緯度枠に合わせ、未校正側を隣市へ張り付ける（隣が t6 でも可） */
+  function attachImagesToNeighbor(images, neighborImages, geoCity) {
     const nSheet = {};
-    for (const img of neighborCalib.images || []) {
-      if (!img.transform) continue;
-      for (const [s, r] of Object.entries(img.sheets)) {
-        if (!nSheet[s]) nSheet[s] = { t: img.transform, r, img };
+    for (const img of neighborImages || []) {
+      if (!img.transform || img.extra) continue;
+      for (const [s, r] of Object.entries(img.sheets || {})) {
+        if (!nSheet[s]) nSheet[s] = rectToBbox(r, img.transform);
       }
     }
+    if (!Object.keys(nSheet).length) return false;
+    let any = false;
     for (const img of images) {
-      const shared = [];
-      for (const [s, r] of Object.entries(img.sheets)) {
-        if (nSheet[s]) shared.push({ r, n: nSheet[s] });
+      if (img.extra) continue;
+      if (img.transform && preTransformsOk([img])) continue;
+      const pts = [];
+      for (const [s, r] of Object.entries(img.sheets || {})) {
+        const b = nSheet[s];
+        if (!b) continue;
+        // b = [latS, lonW, latN, lonE] — 画像上は上が北（y小）
+        pts.push([r[0], r[1], b[1], b[2]]);
+        pts.push([r[2], r[1], b[3], b[2]]);
+        pts.push([r[0], r[3], b[1], b[0]]);
+        pts.push([r[2], r[3], b[3], b[0]]);
       }
       img.transform = null;
       img.quality = { hit: 0, n: 0 };
-      if (!shared.length) continue;
-      const as = [], cs = [], bs = [], ds = [];
-      for (const p of shared) {
-        const ro = p.n.r, rn = p.r, to = p.n.t;
-        const swo = Math.max(1e-9, ro[2] - ro[0]);
-        const sho = Math.max(1e-9, ro[3] - ro[1]);
-        const swn = Math.max(1e-9, rn[2] - rn[0]);
-        const shn = Math.max(1e-9, rn[3] - rn[1]);
-        as.push(to[0] * swo / swn);
-        cs.push(to[2] * sho / shn);
-      }
-      const a = median(as);
-      const c = median(cs);
-      for (const p of shared) {
-        const ro = p.n.r, rn = p.r, to = p.n.t;
-        bs.push(to[0] * ro[0] + to[1] - a * rn[0]);
-        bs.push(to[0] * ro[2] + to[1] - a * rn[2]);
-        ds.push(to[2] * ro[1] + to[3] - c * rn[1]);
-        ds.push(to[2] * ro[3] + to[3] - c * rn[3]);
-      }
-      img.transform = [a, median(bs), c, median(ds)];
-      img.quality = { hit: shared.length, n: shared.length, nPts: shared.length, medRes: 0 };
+      delete img.anchored;
+      if (pts.length < 4) continue;
+      const lat0 = median(pts.map(p => p[3]));
+      let t = fitAffine(pts);
+      if (!t) continue;
+      /* 隣市の経緯度枠に合わせるので、海岸用の縦長寄りの縦横比制約は使わない */
+      t = constrainTransformAspect(t, img, pts, lat0, null) || t;
+      if (isBadTransform(t) || !preTransformsOk([{ sheets: img.sheets, transform: t, extra: false }])) continue;
+      img.transform = t;
+      img.quality = { hit: pts.length / 4, n: pts.length / 4, nPts: pts.length / 4, medRes: 0 };
+      img.anchored = true;
+      any = true;
     }
+    return any;
+  }
+
+  /* 共有図郭の中心が重なるよう、弱い側を軸に沿って平行移動で合わせる */
+  function shiftImageTransforms(images, db, dd) {
+    if (!Number.isFinite(db)) db = 0;
+    if (!Number.isFinite(dd)) dd = 0;
+    if (Math.abs(db) < 1e-9 && Math.abs(dd) < 1e-9) return;
+    for (const img of images || []) {
+      if (!img.transform || img.extra) continue;
+      if (img.transform.length === 4) {
+        img.transform[1] += db;
+        img.transform[3] += dd;
+      } else if (img.transform.length === 6) {
+        img.transform[2] += db;
+        img.transform[5] += dd;
+      }
+    }
+  }
+
+  function sharedSheetDeltas(ownImages, partnerImages) {
+    const srcSheet = {};
+    for (const img of partnerImages || []) {
+      if (!img.transform || img.extra) continue;
+      for (const [s, r] of Object.entries(img.sheets || {})) {
+        if (!srcSheet[s]) srcSheet[s] = rectToBbox(r, img.transform);
+      }
+    }
+    const dLon = [], dLat = [];
+    for (const img of ownImages || []) {
+      if (!img.transform || img.extra) continue;
+      for (const [s, r] of Object.entries(img.sheets || {})) {
+        const b0 = srcSheet[s];
+        if (!b0) continue;
+        const b1 = rectToBbox(r, img.transform);
+        dLon.push(((b0[1] + b0[3]) - (b1[1] + b1[3])) / 2);
+        dLat.push(((b0[0] + b0[2]) - (b1[0] + b1[2])) / 2);
+      }
+    }
+    if (!dLon.length) return null;
+    return { db: median(dLon), dd: median(dLat) };
+  }
+
+  /* 隣市を基準に自市を平行移動（張り付け後の位置合わせ） */
+  function snapPairAlongAxis(ownImages, partnerImages, axis) {
+    const d = sharedSheetDeltas(ownImages, partnerImages);
+    if (!d) return;
+    void axis;
+    shiftImageTransforms(ownImages, d.db, d.dd);
   }
 
   async function nominatimPoi(query, geoCity, ok) {
@@ -476,7 +771,7 @@
 
   /* 索引図の西端列を海岸の目印に、南北は緯度で対応させて枠を置く */
   async function alignByCoastAndHall(images, prefName, geoCity) {
-    const host = images.filter(i => i.transform).sort((a, b) =>
+    const host = images.filter(i => i.transform && i.transform.length === 4).sort((a, b) =>
       Object.keys(b.sheets).length - Object.keys(a.sheets).length)[0];
     if (!host) return;
     const [marina, beach, hall] = await Promise.all([
@@ -512,12 +807,12 @@
     if (pts.length < 2) return;
     let t = fitAffine(pts);
     if (!t) return;
-    t = constrainTransformAspect(t, host, pts, median(pts.map(p => p[3])));
+    t = constrainTransformAspect(t, host, pts, median(pts.map(p => p[3])), geoCity);
     const old = host.transform;
     host.transform = t;
     const hostSz = sheetPixelSize(host);
     for (const img of images) {
-      if (img === host || !img.transform) continue;
+      if (img === host || !img.transform || img.transform.length !== 4) continue;
       const sz = sheetPixelSize(img);
       img.transform[0] = t[0] * hostSz.sw / sz.sw;
       img.transform[2] = t[2] * hostSz.sh / sz.sh;
@@ -527,11 +822,91 @@
     host.quality = Object.assign({}, host.quality, { nPts: 60, medRes: 0 });
   }
 
+  function isBadTransform(t) {
+    if (!t || !t.length) return true;
+    if (!t.every(Number.isFinite)) return true;
+    if (t.length === 6) {
+      // t6: [a,b,c, d,e,f] — d,e は緯度側の係数で | | は通常 1 未満
+      if (Math.abs(t[3]) > 1 || Math.abs(t[4]) > 1) return true;
+      if (Math.abs(t[2]) < 100 || Math.abs(t[2]) > 180) return true; // lon オフセット
+      if (Math.abs(t[5]) < 20 || Math.abs(t[5]) > 50) return true;  // lat オフセット
+      return false;
+    }
+    if (t.length === 4) {
+      if (Math.abs(t[1]) < 100 || Math.abs(t[1]) > 180) return true;
+      if (Math.abs(t[3]) < 20 || Math.abs(t[3]) > 50) return true;
+      return false;
+    }
+    return true;
+  }
+
+  function sheetLonSpan(img, t) {
+    if (!t || !img || !img.sheets) return NaN;
+    if (t.length === 6) {
+      const spans = Object.values(img.sheets).map(r => {
+        const b = rectToBbox(r, t);
+        return Math.abs(b[3] - b[1]);
+      });
+      if (!spans.length) return NaN;
+      return median(spans);
+    }
+    const spans = Object.values(img.sheets).map(r => Math.abs(t[0]) * (r[2] - r[0]));
+    if (!spans.length) return NaN;
+    return median(spans);
+  }
+
+  function sheetLatSpan(img, t) {
+    if (!t || !img || !img.sheets) return NaN;
+    if (t.length === 6) {
+      const spans = Object.values(img.sheets).map(r => {
+        const b = rectToBbox(r, t);
+        return Math.abs(b[2] - b[0]);
+      });
+      if (!spans.length) return NaN;
+      return median(spans);
+    }
+    if (t.length !== 4) return NaN;
+    const spans = Object.values(img.sheets).map(r => Math.abs(t[2]) * (r[3] - r[1]));
+    if (!spans.length) return NaN;
+    return median(spans);
+  }
+
+  /* 事前校正の健全性: 図郭の東西幅は概ね 0.0065〜0.0125°（約600〜1100m）。
+     南北も同程度必要（極端に東西だけ長い変換は棄却）。
+     索引図1枚に縮尺の違う塊が混在する市区（鶴見区など）では、同一GIFに同じ変換を
+     かけると一部クラスタだけ図郭が1.5〜2倍に膨らむ。ウォーカーも同じ事前校正を使うが、
+     こちらはクラスタ分割後に検出し、壊れた事前校正は捨てて接続図校正へ落とす。 */
+  function preTransformsOk(images) {
+    const spans = [];
+    for (const img of images) {
+      if (!img || img.extra || !img.transform) continue;
+      const lon = sheetLonSpan(img, img.transform);
+      const lat = sheetLatSpan(img, img.transform);
+      if (!Number.isFinite(lon) || !Number.isFinite(lat)) return false;
+      if (lon < 0.0065 || lon > 0.0125) return false;
+      /* 南北が極端に短いと東西に延びて見える（大磯の壊れた事前校正など） */
+      if (lat < 0.0028 || lat > 0.010) return false;
+      const wh = lon / lat;
+      if (wh < 0.85 || wh > 2.5) return false;
+      spans.push(lon);
+    }
+    if (spans.length >= 2) {
+      const ratio = Math.max(...spans) / Math.min(...spans);
+      if (ratio > 1.2) return false;
+    }
+    return spans.length > 0;
+  }
+
   async function peekCalib(cache, yr, code, geoCity) {
-    for (const ver of [18, 19]) {
+    for (const ver of [25]) {
       const c = await cache.get('calib_v' + ver + '_' + yr + '_' + code);
       if (c && c.images && c.images.some(i => i.transform) &&
-          (!geoCity || !c.geoCity || c.geoCity === geoCity)) return c;
+          (!geoCity || !c.geoCity || c.geoCity === geoCity)) {
+        const bad = (c.images || []).some(img => !img.extra && isBadTransform(img.transform));
+        if (bad) return null;
+        if (c.pre && !preTransformsOk(c.images || [])) return null;
+        return c;
+      }
     }
     return null;
   }
@@ -552,8 +927,8 @@
   }
 
   async function calibrateRun(prefName, city, geoCity, cityBase, cache, onProgress, cityList, onTowns, code, yr) {
-    const key = 'calib_v18_' + yr + '_' + code;
-    const geoKey = 'geo_v18_' + yr + '_' + code + '_' + geoCity;
+    const key = 'calib_v25_' + yr + '_' + code;
+    const geoKey = 'geo_v25_' + yr + '_' + code + '_' + geoCity;
     const c = await peekCalib(cache, yr, code, geoCity);
     if (c) {
       if (onTowns && c.towns) onTowns(c.towns);
@@ -564,55 +939,127 @@
     const towns = parsed.towns;
     const citySheets = new Set();
     for (const sheets of Object.values(towns || {})) {
-      for (const s of sheets) citySheets.add(s);
+      for (const sid of sheets) citySheets.add(sid);
     }
     const images = splitImagesByClusters(parsed.images, citySheets);
     if (onTowns) onTowns(towns);
 
-    const anchorName = GRID_ANCHOR[city.name] || GRID_ANCHOR[geoCity];
-    if (anchorName) {
-      let cities = cityList;
-      if (!cities || !cities.length) {
-        const m = cityBase.match(/\/(main_[rh]\d+)\/([a-z_0-9]+)\/([a-z_0-9]+)\/prices/);
-        if (m) cities = await getCities({ year: m[1] }, { bureau: m[2], dir: m[3] }, cache);
-      }
-      const ac = cities && cities.length ? resolveCity(cities, anchorName) : null;
-      if (ac && ac.page !== city.page) {
-        if (onProgress) onProgress(anchorName + 'の枠に合わせて準備中…');
-        const aCal = await calibrate(prefName, ac, ac.name, cityBase, cache, onProgress, cities);
-        pinImagesToNeighborSheets(images, aCal);
-        if (images.some(i => i.transform)) {
-          const qAbs = i => (i.quality && (i.quality.nPts || 0)) || 0;
-          snapCrossPageTransforms(images, qAbs);
-          const result = { v: 18, code, city: city.name, geoCity, cityBase, frPage: city.page, towns, images };
-          await cache.set(key, result);
-          return result;
+    const finish = async (result, extra) => {
+      for (const img of result.images || []) {
+        if (img.transform && img.transform.length === 4) {
+          img.transform = boostCoastalSheetHeight(img.transform, img, geoCity);
         }
+      }
+      Object.assign(result, extra || {});
+      result.v = 25;
+      result.geoCity = geoCity;
+      if (result.images.some(i => i.transform)) await cache.set(key, result);
+      return result;
+    };
+
+    let cities = cityList;
+    if (!cities || !cities.length) {
+      const m = cityBase.match(/\/(main_[rh]\d+)\/([a-z_0-9]+)\/([a-z_0-9]+)\/prices/);
+      if (m) cities = await getCities({ year: m[1] }, { bureau: m[2], dir: m[3] }, cache);
+    }
+
+    /* 例外: 葉山↔逗子（南北）・二宮↔大磯（東西）は二つに張り合わせたうえで事前校正 */
+    const pair = GRID_PAIR[city.name] || GRID_PAIR[geoCity];
+    if (pair) {
+      const pc = cities && cities.length ? resolveCity(cities, pair.partner) : null;
+      if (pc && pc.page !== city.page) {
+        if (onProgress) onProgress(pair.partner + 'と張り合わせて事前校正中…');
+        const pCode = pc.page.match(/^([a-z]\d+)fr/)[1];
+        const pParsed = await parseCityPages(cityBase, pc.page);
+        const pSheets = new Set();
+        for (const ss of Object.values(pParsed.towns || {})) {
+          for (const sid of ss) pSheets.add(sid);
+        }
+        const pImages = splitImagesByClusters(pParsed.images, pSheets);
+        const [ownPre, partnerPre] = await Promise.all([
+          fetchPreGrid(yr, code),
+          fetchPreGrid(yr, pCode)
+        ]);
+        const ownOk = applyPreToImages(images, ownPre);
+        const partnerOk = applyPreToImages(pImages, partnerPre);
+        /* 基準側（隣市）を先に海岸補正し、張り付け先の最終サイズに合わせる */
+        for (const img of pImages) {
+          if (img.transform && img.transform.length === 4) {
+            img.transform = boostCoastalSheetHeight(img.transform, img, pair.partner);
+          }
+        }
+        let attached = false;
+        if (!ownOk) {
+          attached = attachImagesToNeighbor(images, pImages, geoCity);
+          /* 隣の最終枠に合わせ済みなので、自市の海岸縦伸ばしはしない */
+          if (attached) {
+            for (const img of images) {
+              if (img.transform) img._coastBoosted = true;
+            }
+          }
+        } else {
+          for (const img of images) {
+            if (img.transform && img.transform.length === 4) {
+              img.transform = boostCoastalSheetHeight(img.transform, img, geoCity);
+            }
+          }
+        }
+        if (attached && pImages.some(i => i.transform)) {
+          snapPairAlongAxis(images, pImages, pair.axis);
+        }
+        if (images.some(i => i.transform) && (ownOk || partnerOk || preTransformsOk(images))) {
+          if (ownOk) addPreExtra(images, ownPre);
+          const preVer = (ownPre && ownOk)
+            ? ((ownPre.built || '') + '/' + (ownPre.extra_v || 0))
+            : ((partnerPre && partnerOk)
+              ? ((partnerPre.built || '') + '/' + (partnerPre.extra_v || 0) + '+attach')
+              : 'pair-attach');
+          return finish({
+            code, city: city.name, cityBase, frPage: city.page, towns, images,
+            pre: { built: (ownOk ? ownPre : partnerPre)?.built || '', ver: preVer },
+            pairAxis: pair.axis, pairWith: pair.partner
+          });
+        }
+        clearImageTransforms(images);
       }
     }
 
+    /* Walker v5: 事前校正（PDF道路アンカー）があれば優先 */
+    let pre = await fetchPreGrid(yr, code);
+    const preVer = pre ? (pre.built || '') + '/' + (pre.extra_v || 0) : '';
+    try {
+      if (pre && applyPreToImages(images, pre)) {
+        addPreExtra(images, pre);
+        /* 事前校正（t6含む）はウォーカー同様そのまま使う。
+           4パラメータ用の snap / ランドマークを混ぜると枠が壊れる。 */
+        return finish({
+          code, city: city.name, cityBase, frPage: city.page, towns, images,
+          pre: { built: pre.built, ver: preVer }
+        });
+      }
+      clearImageTransforms(images);
+      for (let i = images.length - 1; i >= 0; i--) {
+        if (images[i].extra) images.splice(i, 1);
+      }
+    } catch (e) { /* v4 へ */ }
+
+    /* Walker v4: 接続図でつなぎ → 共有縮尺フィット */
     const geo = (await cache.get(geoKey)) || (await cache.get('geo_v19_' + yr + '_' + code + '_' + geoCity)) || {};
-
-    const swOf = i => median(Object.values(i.sheets).map(r => r[2] - r[0]));
-    const shOf = i => median(Object.values(i.sheets).map(r => r[3] - r[1]));
-
     const wanted = new Set();
     const cands = images.map(img => {
-      const singles = [];
-      const multis = [];
+      const elig = [];
       for (const [name, sheets] of Object.entries(towns)) {
-        const onImg = sheets.filter(s => img.sheets[s]);
-        if (!onImg.length) continue;
-        (onImg.length === 1 ? singles : multis).push({ name, n: onImg.length });
+        if (!sheets.length) continue;
+        const inImg = sheets.filter(sid => img.sheets[sid]).length;
+        if (!inImg) continue;
+        elig.push([name, inImg, sheets.length - inImg]);
       }
-      singles.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-      multis.sort((a, b) => a.n - b.n || a.name.localeCompare(b.name, 'ja'));
-      const list = [...singles, ...multis].slice(0, 40).map(x => x.name);
-      for (const name of list) {
-        if (!geo[name]) wanted.add(name);
-      }
+      elig.sort((a, b) => (a[1] + a[2]) - (b[1] + b[2]) || a[2] - b[2] || a[1] - b[1]);
+      const list = elig.slice(0, 25).map(e => e[0]);
+      for (const name of list) if (!geo[name]) wanted.add(name);
       return list;
     });
+    const stitchP = stitchImages(cityBase, images, onProgress).catch(() => null);
     const queue = [...wanted];
     const total = queue.length;
     let done = 0;
@@ -624,15 +1071,15 @@
         if (onProgress) onProgress('地図の枠を準備中… ' + done + '/' + total);
       }
     }));
+    const st = (await stitchP) || { offs: images.map(() => [0, 0]), comp: images.map((_, i) => i), conn: {} };
 
-    const ptsAll = [];
-    for (let ii = 0; ii < images.length; ii++) {
-      const img = images[ii];
+    const ptsAll = [], P = [];
+    images.forEach((img, ii) => {
       const pts = [];
       for (const name of cands[ii]) {
         const g = geo[name];
         if (!g) continue;
-        const rects = (towns[name] || []).map(s => img.sheets[s]).filter(Boolean);
+        const rects = (towns[name] || []).filter(sid => img.sheets[sid]).map(sid => img.sheets[sid]);
         if (!rects.length) continue;
         const x1 = Math.min(...rects.map(r => r[0])), y1 = Math.min(...rects.map(r => r[1]));
         const x2 = Math.max(...rects.map(r => r[2])), y2 = Math.max(...rects.map(r => r[3]));
@@ -641,131 +1088,113 @@
       ptsAll.push(pts);
       img.transform = null;
       img.quality = { hit: 0, n: 0 };
-      // 町村は町丁が少なく5点に満たない（葉山町は4町）。2点あれば軸ごとにフィット可能
-      if (pts.length < 2) continue;
-      // 単図郭の点だけで足りるならそれでフィット（多図郭町丁の広域重心ノイズを避ける）
-      const singlesOnly = pts.filter(p => p[5] === 1);
-      const fitPts = singlesOnly.length >= 6 ? singlesOnly : pts;
-      let t = fitAffine(fitPts);
-      if (!t) continue;
-      const lat0 = median(pts.map(p => p[3]));
-      t = constrainTransformAspect(t, img, pts, lat0);
-      // ロバスト化: 残差が図郭1枚分を超える点を捨てて再フィット
+      img.off = st.offs[ii];
+      img.comp = st.comp[ii];
       const sw = swOf(img), sh = shOf(img);
-      const good = fitPts.filter(p =>
-        Math.abs((p[2] - t[1]) / t[0] - p[0]) < sw && Math.abs((p[3] - t[3]) / t[2] - p[1]) < sh);
-      if (good.length >= 3) {
-        const t2 = fitAffine(good);
-        if (t2) t = constrainTransformAspect(t2, img, good, lat0);
+      for (const p of pts) {
+        P.push([p[0] / sw + img.off[0], p[1] / sh + img.off[1], p[2], p[3], p[4], p[5], ii, img.comp]);
       }
+    });
+
+    let T = P.length >= 5 ? fitShared(P) : null;
+    if (T) {
+      const good = P.filter(p => {
+        const t = T[p[7]];
+        return t && Math.abs((p[2] - t[1]) / t[0] - p[0]) < 1 && Math.abs((p[3] - t[3]) / t[2] - p[1]) < 1;
+      });
+      if (good.length >= 5) {
+        const T2 = fitShared(good);
+        if (T2) T = T2;
+      }
+    }
+    images.forEach((img, ii) => {
+      const t = T && T[img.comp];
+      if (!t) return;
+      const sw = swOf(img), sh = shOf(img);
+      let tr = [t[0] / sw, t[0] * img.off[0] + t[1], t[2] / sh, t[2] * img.off[1] + t[3]];
+      tr = constrainTransformAspect(tr, img, ptsAll[ii], median(ptsAll[ii].map(p => p[3])), geoCity);
+      img.transform = tr;
       let hit = 0;
-      const singles = pts.filter(p => p[5] === 1);
+      const singles = ptsAll[ii].filter(p => p[5] === 1);
       for (const p of singles) {
-        const px = (p[2] - t[1]) / t[0], py = (p[3] - t[3]) / t[2];
-        const ok = towns[p[4]].some(s => {
-          const r = img.sheets[s];
+        const px = (p[2] - img.transform[1]) / img.transform[0];
+        const py = (p[3] - img.transform[3]) / img.transform[2];
+        const ok = towns[p[4]].some(sid => {
+          const r = img.sheets[sid];
           return r && r[0] <= px && px <= r[2] && r[1] <= py && py <= r[3];
         });
         if (ok) hit++;
       }
-      // 単独図郭の町が無い画像は、残差の小ささで暫定スコアを付ける（縮尺選定用）
-      const res = pts.map(p => {
-        const px = (p[2] - t[1]) / t[0], py = (p[3] - t[3]) / t[2];
-        return Math.hypot(px - p[0], py - p[1]);
-      });
-      img.transform = t;
-      img.quality = {
-        hit,
-        n: singles.length,
-        medRes: median(res),
-        nPts: pts.length
-      };
-    }
+      img.quality = { hit, n: singles.length, nPts: ptsAll[ii].length };
+    });
 
-    // 索引図ごとに縮尺を独立推定すると、画像境界で図郭が100〜160mずれる。
-    // 最も信頼できる画像の縮尺を全区で共有し、各画像は平行移動だけ合わせる。
-    // アンカーは「制御点の多さ・残差」を優先（hit率だけだと絶対位置の悪い画像が選ばれる）。
-    const qAbs = i => {
-      if (!i.quality) return -1;
-      const nPts = i.quality.nPts || 0;
-      const medRes = i.quality.medRes != null ? i.quality.medRes : 999;
-      const hit = i.quality.n ? i.quality.hit / i.quality.n : 0;
-      return nPts * 10 - medRes + hit;
-    };
-    const bestImg = images.filter(i => i.transform).sort((a, b) => qAbs(b) - qAbs(a))[0];
+    const agg = {};
+    for (const img of images) {
+      if (!img.transform) continue;
+      const a = agg[img.comp] = agg[img.comp] || { hit: 0, n: 0 };
+      a.hit += img.quality.hit; a.n += img.quality.n;
+    }
+    for (const img of images) if (img.transform) img.quality = Object.assign({}, img.quality, agg[img.comp]);
+
+    const qOf2 = i => (i.quality && i.quality.n ? i.quality.hit / i.quality.n : 0);
+    const bestImg = images.filter(i => i.transform).sort((a, b) => qOf2(b) - qOf2(a))[0];
     if (bestImg) {
       for (let ii = 0; ii < images.length; ii++) {
         const img = images[ii];
-        const P = ptsAll[ii];
-        if (!P.length) continue;
+        if (img.transform || !ptsAll[ii].length) continue;
         const a = bestImg.transform[0] * swOf(bestImg) / swOf(img);
         const c = bestImg.transform[2] * shOf(bestImg) / shOf(img);
-        // 単図郭の点を倍重視して平行移動を決める
-        const weighted = [];
-        for (const p of P) {
-          weighted.push(p);
-          if (p[5] === 1) weighted.push(p);
-        }
-        let b = weighted.reduce((s, p) => s + (p[2] - a * p[0]), 0) / weighted.length;
-        let d = weighted.reduce((s, p) => s + (p[3] - c * p[1]), 0) / weighted.length;
-        const sw = swOf(img), sh = shOf(img);
-        for (let iter = 0; iter < 2; iter++) {
-          const good = weighted.filter(p => {
-            const px = (p[2] - b) / a, py = (p[3] - d) / c;
-            return Math.abs(px - p[0]) < sw * 0.6 && Math.abs(py - p[1]) < sh * 0.6;
-          });
-          if (good.length >= 3) {
-            b = good.reduce((s, p) => s + (p[2] - a * p[0]), 0) / good.length;
-            d = good.reduce((s, p) => s + (p[3] - c * p[1]), 0) / good.length;
-          }
-        }
-        const t = constrainTransformAspect([a, b, c, d], img, P, median(P.map(p => p[3])));
-        let hit = 0;
-        const singles = P.filter(p => p[5] === 1);
-        for (const p of singles) {
-          const px = (p[2] - t[1]) / t[0], py = (p[3] - t[3]) / t[2];
-          const ok = towns[p[4]].some(s => {
-            const r = img.sheets[s];
-            return r && r[0] <= px && px <= r[2] && r[1] <= py && py <= r[3];
-          });
-          if (ok) hit++;
-        }
-        const prev = img.quality || {};
-        img.transform = t;
-        img.quality = {
-          hit,
-          n: singles.length,
-          nPts: prev.nPts || P.length,
-          medRes: prev.medRes
-        };
+        const Pb = ptsAll[ii];
+        const b = Pb.reduce((sum, p) => sum + (p[2] - a * p[0]), 0) / Pb.length;
+        const d = Pb.reduce((sum, p) => sum + (p[3] - c * p[1]), 0) / Pb.length;
+        img.transform = constrainTransformAspect([a, b, c, d], img, Pb, median(Pb.map(p => p[3])), geoCity);
+        img.quality = { hit: 0, n: 0, nPts: Pb.length };
       }
-      // ページまたぎの図郭が重ならないよう fringe で相対位置を合わせる
-      snapCrossPageTransforms(images, qAbs);
-      const fewTowns = Object.keys(towns).length <= 8;
-      // 町丁が少ないと町名代表点が東西に並ばず、ここで絶対位置を戻すと海岸から外れる
-      if (!fewTowns) alignAbsoluteTranslation(images, ptsAll);
-      const pinned = await alignSheetLandmarks(images, geoCity, onProgress);
-      if (fewTowns && !pinned) {
-        if (onProgress) onProgress('海岸と役場で位置を合わせています…');
-        try {
-          await alignByCoastAndHall(images, prefName, geoCity);
-        } catch (e) { /* 外部地図が取れなくても校正結果は残す */ }
-      }
-      if (fewTowns || pinned) snapCrossPageTransforms(images, qAbs);
     }
+
+    /* 例外後処理（従来どおり） */
+    const qAbs = i => {
+      if (!i.quality) return -1;
+      const nPts = i.quality.nPts || 0;
+      const hit = i.quality.n ? i.quality.hit / i.quality.n : 0;
+      return nPts * 10 + hit;
+    };
+    snapCrossPageTransforms(images, qAbs);
+    const fewTowns = Object.keys(towns).length <= 8;
+    if (!fewTowns) alignAbsoluteTranslation(images, ptsAll);
+    const pinned = await alignSheetLandmarks(images, geoCity, onProgress);
+    if (fewTowns && !pinned) {
+      if (onProgress) onProgress('海岸と役場で位置を合わせています…');
+      try { await alignByCoastAndHall(images, prefName, geoCity); } catch (e) { /* ignore */ }
+    }
+    if (fewTowns || pinned) snapCrossPageTransforms(images, qAbs);
+
     await cache.set(geoKey, geo);
-    const result = { v: 18, code, city: city.name, geoCity, cityBase, frPage: city.page, towns, images };
-    // 1画像も枠が張れなかった結果はキャッシュしない（次回の再挑戦を妨げないため）
-    if (images.some(i => i.transform)) await cache.set(key, result);
-    return result;
+    return finish({ code, city: city.name, cityBase, frPage: city.page, towns, images, conn: st.conn });
   }
 
   // ---------------- 検索 ----------------
 
   function rectToBbox(r, t) {
+    if (t.length === 6) {
+      const cx = (r[0] + r[2]) / 2, cy = (r[1] + r[3]) / 2;
+      const lon = t[0] * cx + t[1] * cy + t[2], lat = t[3] * cx + t[4] * cy + t[5];
+      const w = Math.abs(t[0]) * (r[2] - r[0]) / 2, h = Math.abs(t[4]) * (r[3] - r[1]) / 2;
+      return [lat - h, lon - w, lat + h, lon + w];
+    }
     const lons = [t[0] * r[0] + t[1], t[0] * r[2] + t[1]];
     const lats = [t[2] * r[1] + t[3], t[2] * r[3] + t[3]];
     return [Math.min(...lats), Math.min(...lons), Math.max(...lats), Math.max(...lons)];
+  }
+
+  function lonLatToPx(lon, lat, t) {
+    if (t.length === 6) {
+      const det = t[0] * t[4] - t[1] * t[3];
+      if (!det) return [NaN, NaN];
+      const dx = lon - t[2], dy = lat - t[5];
+      return [(t[4] * dx - t[1] * dy) / det, (t[0] * dy - t[3] * dx) / det];
+    }
+    return [(lon - t[1]) / t[0], (lat - t[3]) / t[2]];
   }
 
   /* 全区の図郭相対関係を崩さず、制御点残差の中央値で平行移動だけ合わせる */
@@ -776,7 +1205,7 @@
       const img = images[ii];
       const t = img.transform;
       const P = ptsAll[ii];
-      if (!t || !P || !P.length) continue;
+      if (!t || t.length !== 4 || !P || !P.length) continue;
       for (const p of P) {
         const predLon = t[0] * p[0] + t[1];
         const predLat = t[2] * p[1] + t[3];
@@ -792,7 +1221,7 @@
     const dd = median(dLats);
     if (Math.abs(db) < 1e-12 && Math.abs(dd) < 1e-12) return;
     for (const img of images) {
-      if (!img.transform) continue;
+      if (!img.transform || img.transform.length !== 4) continue;
       img.transform[1] += db;
       img.transform[3] += dd;
     }
@@ -869,15 +1298,16 @@
       if (pts.length > hostPts.length) { host = img; hostPts = pts; }
     }
     if (!host) return false;
+    if (host.transform && host.transform.length !== 4) return false;
     if (hostPts.length >= 2) {
       let t = fitAffine(hostPts);
       if (!t) return false;
-      t = constrainTransformAspect(t, host, hostPts, median(hostPts.map(p => p[3])));
+      t = constrainTransformAspect(t, host, hostPts, median(hostPts.map(p => p[3])), geoCity);
       const old = host.transform;
       host.transform = t;
       const hostSz = sheetPixelSize(host);
       for (const img of images) {
-        if (img === host || !img.transform) continue;
+        if (img === host || !img.transform || img.transform.length !== 4) continue;
         const sz = sheetPixelSize(img);
         img.transform[0] = t[0] * hostSz.sw / sz.sw;
         img.transform[2] = t[2] * hostSz.sh / sz.sh;
@@ -887,13 +1317,14 @@
       host.quality = Object.assign({}, host.quality, { nPts: 80, medRes: 0 });
       return true;
     }
-    const img0 = images.find(i => i.transform && byImg.has(i));
+    const img0 = images.find(i => i.transform && i.transform.length === 4 && byImg.has(i));
+    if (!img0) return false;
     const p = hostPts[0];
     const t0 = img0.transform;
     const db = p[2] - (t0[0] * p[0] + t0[1]);
     const dd = p[3] - (t0[2] * p[1] + t0[3]);
     for (const img of images) {
-      if (!img.transform) continue;
+      if (!img.transform || img.transform.length !== 4) continue;
       img.transform[1] += db;
       img.transform[3] += dd;
     }
@@ -1001,7 +1432,7 @@
   /* 索引図が複数ページに分かれる市区で、ページ端 fringe 同士を突き合わせて平行移動を合わせる。
      幾何的な「約1図郭隣」検出だと、0.8図郭分の隙間で検出漏れするため fringe 方式を使う。 */
   function snapCrossPageTransforms(images, qOf) {
-    const active = images.filter(i => i.transform);
+    const active = images.filter(i => i.transform && i.transform.length === 4 && !i.extra);
     if (active.length < 2) return;
     const anchor = active.slice().sort((a, b) => qOf(b) - qOf(a))[0];
     const med0 = arr => (arr.length ? median(arr) : 0);
@@ -1128,7 +1559,7 @@
     }
 
     const bySheet = new Map(entries.map(e => [e.sheet, e]));
-    const active = images.filter(i => i.transform);
+    const active = images.filter(i => i.transform && !i.extra);
     const cents = new Map(active.map(img => [img, imgCentroid(img)]));
     for (let i = 0; i < active.length; i++) {
       for (let j = i + 1; j < active.length; j++) {
@@ -1184,7 +1615,7 @@
     for (const img of calib.images) {
       const t = img.transform;
       if (!t) continue;
-      const px = (lon - t[1]) / t[0], py = (lat - t[3]) / t[2];
+      const [px, py] = lonLatToPx(lon, lat, t);
       for (const [s, r] of Object.entries(img.sheets)) {
         if (r[0] <= px && px <= r[2] && r[1] <= py && py <= r[3]) {
           const q = img.quality.n ? img.quality.hit / img.quality.n : 0;
@@ -1238,10 +1669,20 @@
             pdf: cityBase + 'pdf/' + s + '.pdf',
             page: cityBase + 'html/' + s + 'f.htm'
           };
+          if (img.extra) gridMap[s].extra = true;
+          if (img.est && img.est[s]) gridMap[s].est = true;
           edgeEntries.push({ sheet: s, bbox, imgIdx });
         }
       });
-      if (intoEdges) correctCrossPageEdges(edgeEntries, imgs);
+      // 事前校正済みはウォーカー同様、継ぎ目補正しない。
+      // 同一GIFのクラスタ分割があるときも、fringe 補正が図郭を潰すので行わない。
+      // _extra（経緯度直置き）を混ぜると正規の枠が大きくずれる。
+      if (intoEdges && !cal.pre) {
+        const real = imgs.filter(i => !i.extra);
+        const gifs = real.map(i => i.gif);
+        const clustered = gifs.length !== new Set(gifs).size;
+        if (!clustered) correctCrossPageEdges(edgeEntries, real);
+      }
     };
     for (const p of packs) addCalibGrid(p.cal, p.name, p.edges);
     const grid = Object.values(gridMap);
